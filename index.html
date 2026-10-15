@@ -1,0 +1,2462 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>熱帶叢林蛇梯棋 - WW3 (四年級) & Super Fun 5 (五年級) 雙教材整合版</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 SheetJS (xlsx) 支援真正的 Excel (.xlsx / .xls / .csv) 讀寫 -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --print-w: 297mm;
+      --print-h: 210mm;
+      --print-margin: 0mm;
+    }
+    body {
+      font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+      background-color: #0b2217;
+      user-select: none;
+    }
+    .board-number {
+      font-family: 'Fredoka', 'Arial Black', sans-serif;
+      font-weight: 800;
+      fill: #ffeb3b;
+      stroke: #152218;
+      stroke-width: 5px;
+      paint-order: stroke fill;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      font-size: 27px;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+    .board-cell {
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+    .board-cell:hover {
+      filter: brightness(1.16) contrast(1.05);
+    }
+    .dice-box {
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .dice-rolling {
+      animation: shake 0.4s infinite;
+    }
+    @keyframes shake {
+      0% { transform: rotate(0deg) scale(1.08); }
+      25% { transform: rotate(-16deg) scale(1.14); }
+      50% { transform: rotate(16deg) scale(1.08); }
+      75% { transform: rotate(-12deg) scale(1.14); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    .pawn-group {
+      transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @media print {
+      @page {
+        size: landscape;
+        margin: var(--print-margin);
+      }
+      body {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #printWrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      #boardContainer {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+      #snakesBoardSvg {
+        width: 100% !important;
+        height: 100% !important;
+      }
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f291e; }
+    ::-webkit-scrollbar-thumb { background: #2e6f40; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3fa35b; }
+  </style>
+</head>
+<body class="min-h-screen text-white flex flex-col items-center p-2 md:p-4">
+
+  <!-- 頂部控制列 -->
+  <header class="no-print w-full max-w-[1440px] bg-emerald-950/95 backdrop-blur-md border border-emerald-700/60 rounded-2xl p-3 mb-3 shadow-2xl flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-400 to-emerald-600 flex items-center justify-center shadow-md text-2xl">
+        🐍
+      </div>
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <h1 class="text-base md:text-lg font-black tracking-wide text-lime-300">
+            英語叢林蛇梯棋 Snakes & Ladders
+          </h1>
+          <!-- 雙教材一鍵切換下拉選單 -->
+          <div class="flex items-center bg-amber-400 text-slate-950 rounded-xl px-2 py-0.5 shadow-md border-2 border-amber-200">
+            <span class="text-xs font-black mr-1">📚 題庫教材：</span>
+            <select id="bookSelector" onchange="switchTextbook(this.value)" class="bg-transparent text-xs md:text-sm font-black text-slate-950 focus:outline-none cursor-pointer pr-1">
+              <option value="SF5">📘 五年級 Super Fun 5 (50題)</option>
+              <option value="WW3">📗 四年級 Wonder World 3 (50題)</option>
+            </select>
+          </div>
+        </div>
+        <p class="text-xs text-emerald-300/80 mt-0.5">圖片零洩題 • 去單元標籤 • 聽力音稿分離 • A/B/C 自動判讀 • 支援微軟 Azure / 自然語音</p>
+      </div>
+    </div>
+
+    <!-- 中間與右側：組別、音效、語音設定、題庫管理與列印 -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- 玩家人數選擇 -->
+      <div class="flex items-center bg-emerald-900/90 border border-emerald-700 rounded-xl p-1 gap-1">
+        <span class="text-xs font-bold text-emerald-300 px-2">組別</span>
+        <button onclick="setPlayerCount(1)" id="pBtn1" class="px-2 py-1 rounded-lg text-xs font-black transition">1組</button>
+        <button onclick="setPlayerCount(2)" id="pBtn2" class="px-2 py-1 rounded-lg text-xs font-black transition">2組</button>
+        <button onclick="setPlayerCount(3)" id="pBtn3" class="px-2 py-1 rounded-lg text-xs font-black transition">3組</button>
+        <button onclick="setPlayerCount(4)" id="pBtn4" class="px-2 py-1 rounded-lg text-xs font-black transition">4組</button>
+      </div>
+
+      <!-- 音效與高擬真語音設定按鈕 -->
+      <button onclick="toggleSound()" id="soundToggleBtn" class="px-2.5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 border border-emerald-600 text-xs font-bold flex items-center gap-1 transition shadow">
+        <span id="soundIcon">🔊</span> <span id="soundText">音效：開</span>
+      </button>
+      <button onclick="openVoiceSettings()" class="px-2.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-700 border border-teal-500 text-xs font-bold flex items-center gap-1 transition shadow" title="切換內建自然語音或綁定微軟 Azure 語音 API Key">
+        🎙️ <span id="voiceEngineBadge">語音設定</span>
+      </button>
+
+      <!-- 課堂題庫模式開關與 Excel -->
+      <div class="flex items-center gap-1 bg-indigo-950/90 border border-indigo-500/80 rounded-xl p-1">
+        <button onclick="toggleQuizMode()" id="quizToggleBtn" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold flex items-center gap-1 transition shadow">
+          <span>🎓</span> <span id="quizModeText">題庫：開啟</span>
+        </button>
+        <button onclick="openQuizEditor()" class="px-2.5 py-1 rounded-lg bg-purple-700 hover:bg-purple-600 text-xs font-bold text-white transition flex items-center gap-1 shadow">
+          ✏️ 題庫管理 <span id="headerImgBadge" class="bg-pink-500 text-[10px] px-1.5 rounded-full">50題</span>
+        </button>
+        <button onclick="exportQuestionsToExcel()" class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-black text-white transition flex items-center gap-1 shadow" title="下載目前所選教材的 Excel 題庫">
+          📤 匯出 Excel
+        </button>
+      </div>
+
+      <!-- 桌遊列印與輸出工作坊按鈕 -->
+      <button onclick="openPrintStudio()" class="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg transition flex items-center gap-1">
+        🖨️ 印出桌遊
+      </button>
+    </div>
+  </header>
+
+  <!-- 遊戲主舞台與互動控制面板 -->
+  <div id="printWrapper" class="w-full max-w-[1440px] flex flex-col lg:flex-row gap-3 items-center lg:items-stretch justify-center">
+
+    <!-- 左側 / 中央：高精準度 SVG 向量棋盤 -->
+    <div id="boardContainer" class="relative w-full lg:flex-1 bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-emerald-700/80 aspect-[1400/990] flex items-center justify-center">
+      <svg id="snakesBoardSvg" viewBox="0 0 1400 990" xmlns="http://www.w3.org/2000/svg" class="w-full h-full block">
+        <defs>
+          <filter id="stickerShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#051b10" flood-opacity="0.48" />
+          </filter>
+          <filter id="itemShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="2" dy="4" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.42" />
+          </filter>
+          <filter id="pawnShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.55" />
+          </filter>
+          <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff380" />
+            <stop offset="40%" stop-color="#ffd000" />
+            <stop offset="85%" stop-color="#f59e0b" />
+            <stop offset="100%" stop-color="#b45309" />
+          </linearGradient>
+        </defs>
+
+        <rect width="1400" height="990" fill="#eef9ec" />
+        <g id="jungleFoliageLayer"></g>
+        <g id="stickerOutlineLayer" filter="url(#stickerShadow)"></g>
+        <g id="snakeDarkRimLayer"></g>
+        <g id="cellsLayer"></g>
+        <g id="headAndTrophyLayer"></g>
+        <g id="laddersLayer" filter="url(#itemShadow)"></g>
+        <g id="snakesLayer" filter="url(#itemShadow)"></g>
+        <g id="numbersLayer"></g>
+        <g id="pawnsLayer"></g>
+      </svg>
+    </div>
+
+    <!-- 右側：多人對戰與擲骰互動面板 -->
+    <aside class="no-print w-full lg:w-80 bg-emerald-950/95 border border-emerald-700/70 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-2xl">
+      <div>
+        <div class="flex items-center justify-between border-b border-emerald-800 pb-2 mb-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">目前戰況與輪次</span>
+          <button onclick="resetGame()" class="text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-200 px-2.5 py-1 rounded-lg font-bold transition">
+            🔄 重新開局
+          </button>
+        </div>
+
+        <div id="playersStatusList" class="grid grid-cols-2 lg:grid-cols-1 gap-2 mb-3"></div>
+
+        <div class="bg-emerald-900/75 border border-emerald-700/80 rounded-2xl p-3.5 flex flex-col items-center text-center shadow-inner">
+          <div id="turnBanner" class="text-xs font-black px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30 mb-2">
+            輪到：Team 1 小紅
+          </div>
+
+          <div class="flex items-center gap-4 my-1">
+            <div id="diceVisual" onclick="rollDice()" class="dice-box cursor-pointer w-16 h-16 bg-white rounded-2xl shadow-xl border-4 border-amber-400 flex items-center justify-center text-slate-900 font-black text-3xl select-none hover:scale-105 active:scale-95">
+              🎲
+            </div>
+            <button id="rollBtn" onclick="rollDice()" class="px-5 py-3.5 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-base shadow-xl active:translate-y-0.5 transition">
+              擲骰子前進！
+            </button>
+          </div>
+
+          <p id="statusMsg" class="text-xs text-emerald-200 font-medium mt-2 min-h-[34px] flex items-center justify-center">
+            點擊「擲骰子前進」，或點擊棋盤任意格直接抽考該格題目！
+          </p>
+        </div>
+      </div>
+
+      <!-- 動態教材能力指標分布速查表 (隨下拉選單自動切換) -->
+      <div class="bg-emerald-900/40 border border-emerald-800/80 rounded-xl p-3 text-xs space-y-2">
+        <div class="font-bold text-amber-300 flex items-center justify-between border-b border-emerald-800 pb-1">
+          <span id="sidebarBookTitle">📘 Super Fun 5 指標分布</span>
+          <span class="text-[10px] text-emerald-300">點擊格子可直達</span>
+        </div>
+        <div id="sidebarScopeList" class="grid grid-cols-1 gap-1 text-[11px] text-emerald-100 leading-tight">
+          <!-- 由 JS 動態填入 SF5 或 WW3 的指標分布 -->
+        </div>
+
+        <div class="font-bold text-emerald-300 flex items-center justify-between pt-1 border-t border-emerald-800/80">
+          <span>🎧 聽力題 (隱藏音稿不洩題)</span>
+          <span class="text-[10px] text-amber-300">自動播放發音</span>
+        </div>
+        <div class="font-bold text-emerald-300 flex items-center justify-between">
+          <span>🖼️ 圖片閃卡 (100% 隱藏答案)</span>
+          <span class="text-[10px] text-sky-300">點擊選項自動判讀</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 彈出視窗 0：高擬真英語語音升級設定 -->
+  <div id="voiceSettingsModal" class="no-print fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-teal-400 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🎙️</span>
+          <div>
+            <h2 class="text-lg font-black text-teal-300">英語聽力語音引擎升級設定</h2>
+            <p class="text-xs text-slate-400">支援「免外掛 Natural 自然語音過濾」與「微軟 Azure 雲端真人語音 API」</p>
+          </div>
+        </div>
+        <button onclick="closeVoiceSettings()" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
+      </div>
+
+      <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black text-lime-300">方案 A：瀏覽器內建最佳英語聲源（免費免金鑰）</span>
+          <span class="text-[10px] bg-lime-500/20 text-lime-300 px-2 py-0.5 rounded-full border border-lime-500/40">預設啟用</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          系統會自動優先挑選電腦內建的 <b>Microsoft Aria / Ana / Guy (Online Natural)</b> 或 <b>Google US English</b> 真人級發音，您也可在此手動指定：
+        </p>
+        <select id="browserVoiceSelect" onchange="saveVoiceSettings()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-teal-400"></select>
+        <div class="flex items-center justify-between pt-1">
+          <label class="text-xs text-slate-300 font-bold">語速調整 (<span id="rateValLabel">0.88</span>x)：</label>
+          <input type="range" id="voiceRateInput" min="0.65" max="1.15" step="0.05" value="0.88" oninput="document.getElementById('rateValLabel').textContent=this.value; saveVoiceSettings()" class="w-44 accent-teal-400" />
+        </div>
+      </div>
+
+      <div class="bg-slate-950/90 border border-teal-800/70 rounded-2xl p-4 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black text-teal-300">方案 B：微軟 Azure 雲端真人語音 API（選填）</span>
+          <span class="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/40">F0 每月 50萬字免費</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          若填入 Azure Speech API Key，遊戲將直接呼叫微軟雲端最頂級的 <b>en-US-AnaNeural（美國童音）</b> 或 <b>JennyNeural（美式女師）</b> 播音；若留空則自動使用上方方案 A。
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="sm:col-span-2">
+            <label class="text-[10px] text-slate-400 font-bold block mb-1">Azure API Key (Key 1)</label>
+            <input type="password" id="azureApiKeyInput" placeholder="選填：貼上 Azure Speech Key..." oninput="saveVoiceSettings()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-teal-400" />
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-400 font-bold block mb-1">區域 (Region)</label>
+            <input type="text" id="azureRegionInput" placeholder="如 eastasia" value="eastasia" oninput="saveVoiceSettings()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-mono focus:outline-none focus:border-teal-400" />
+          </div>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 font-bold block mb-1">選擇微軟 Azure 英語主播聲源</label>
+          <select id="azureVoiceNameSelect" onchange="saveVoiceSettings()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold">
+            <option value="en-US-JennyNeural">🇺🇸 JennyNeural (溫暖清楚的美式英語女老師 - 最推薦)</option>
+            <option value="en-US-AnaNeural">🇺🇸 AnaNeural (活潑可愛的美國小女孩童音)</option>
+            <option value="en-US-AriaNeural">🇺🇸 AriaNeural (自然流暢的美式英語女聲)</option>
+            <option value="en-US-GuyNeural">🇺🇸 GuyNeural (陽光清晰的美式英語男老師)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <button onclick="testVoicePlayback()" class="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-lg transition flex items-center gap-1.5">
+          🔊 立即試聽發音 ("How's the weather? It's sunny!")
+        </button>
+        <button onclick="closeVoiceSettings()" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs shadow-lg transition">
+          ✓ 完成設定
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈出視窗 1：印出桌遊與高解析輸出工作坊 -->
+  <div id="printStudioModal" class="no-print fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-emerald-950 border-2 border-amber-400/80 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-emerald-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🖨️</span>
+          <div>
+            <h2 class="text-lg font-black text-amber-300">印出實體桌遊 & 高解析圖檔工作坊</h2>
+            <p class="text-xs text-emerald-300">支援 A4、JIS B4（學校/超商海報常用）、A3 橫向滿版輸出</p>
+          </div>
+        </div>
+        <button onclick="closePrintStudio()" class="text-emerald-400 hover:text-white text-xl font-bold px-2">✕</button>
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-xs font-bold text-emerald-300 block">步驟 1：選擇目標紙張尺寸（皆為橫向 Landscape 最佳比例）</label>
+        <div class="grid grid-cols-3 gap-2.5">
+          <button onclick="selectPaperSize('A4')" id="sizeBtn_A4" class="p-3 rounded-2xl border-2 text-left transition flex flex-col justify-between">
+            <div class="font-black text-base text-white">A4 標準</div>
+            <div class="text-[11px] text-emerald-300 mt-1">297 × 210 mm</div>
+            <div class="text-[10px] text-amber-300 mt-0.5">3508 × 2480 px</div>
+          </button>
+          <button onclick="selectPaperSize('B4')" id="sizeBtn_B4" class="p-3 rounded-2xl border-2 text-left transition flex flex-col justify-between">
+            <div class="font-black text-base text-white flex items-center justify-between">
+              <span>B4 大桌遊</span>
+              <span class="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded font-black">推薦</span>
+            </div>
+            <div class="text-[11px] text-emerald-300 mt-1">364 × 257 mm</div>
+            <div class="text-[10px] text-amber-300 mt-0.5">4299 × 3035 px</div>
+          </button>
+          <button onclick="selectPaperSize('A3')" id="sizeBtn_A3" class="p-3 rounded-2xl border-2 text-left transition flex flex-col justify-between">
+            <div class="font-black text-base text-white">A3 巨型海報</div>
+            <div class="text-[11px] text-emerald-300 mt-1">420 × 297 mm</div>
+            <div class="text-[10px] text-amber-300 mt-0.5">4961 × 3508 px</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-emerald-900/60 border border-emerald-800 rounded-2xl p-3.5 space-y-2.5 text-xs">
+        <label class="flex items-center justify-between cursor-pointer">
+          <span class="font-bold text-emerald-100">隱藏棋盤上的虛擬棋子（輸出純淨桌遊底圖）</span>
+          <input type="checkbox" id="hidePawnsOnExport" checked class="w-4 h-4 accent-amber-400 rounded cursor-pointer" />
+        </label>
+        <label class="flex items-center justify-between cursor-pointer">
+          <span class="font-bold text-emerald-100">保留 5mm 安全裁切白邊（避免印表機邊緣裁切到數字）</span>
+          <input type="checkbox" id="keepSafeMargin" class="w-4 h-4 accent-amber-400 rounded cursor-pointer" />
+        </label>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button onclick="triggerDirectPrint()" class="py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-black text-sm shadow-lg flex items-center justify-center gap-2 transition">
+            🖨️ 立即呼叫印表機列印 (<span id="printBtnSizeLabel">B4</span>)
+          </button>
+          <button onclick="exportHighResPNG()" id="exportPngBtn" class="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition border border-emerald-400/40">
+            🖼️ 下載 300 DPI 印刷級 PNG (<span id="pngBtnSizeLabel">B4</span>)
+          </button>
+        </div>
+        <button onclick="downloadVectorSVG()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-emerald-200 font-bold text-xs border border-emerald-700 transition flex items-center justify-center gap-2">
+          📐 下載無限放大向量檔 (.SVG) — 可匯入 Illustrator / Canva 印刷
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈出視窗 2：課堂挑戰視窗 (圖片零洩題 + 題目無單元標籤) -->
+  <div id="quizChallengeModal" class="no-print fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-3 md:p-4">
+    <div class="bg-indigo-950 border-2 border-indigo-400 rounded-3xl max-w-xl w-full p-5 md:p-6 shadow-2xl text-center space-y-3.5">
+      <div class="flex items-center justify-between">
+        <div id="quizBadge" class="inline-block px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs">
+          🎓 機會挑戰題
+        </div>
+        <span id="quizProgressBadge" class="text-[11px] text-indigo-300 font-bold bg-indigo-900/80 px-2.5 py-1 rounded-full border border-indigo-700">
+          題庫
+        </span>
+      </div>
+      
+      <h3 id="quizTitle" class="text-base md:text-lg font-black text-white">回答問題！</h3>
+      
+      <div class="bg-indigo-900/90 border-2 border-indigo-600/80 rounded-2xl p-4 min-h-[130px] flex flex-col items-center justify-center gap-3 shadow-inner">
+        <div id="quizImageWrapper" class="hidden w-full flex-col items-center justify-center">
+          <div class="relative group cursor-zoom-in" onclick="openImageLightbox()" title="點擊放大全螢幕檢視">
+            <img id="quizImageEl" src="" alt="題目圖片" class="max-h-48 md:max-h-56 w-auto mx-auto rounded-xl border-2 border-indigo-400/70 shadow-lg object-contain bg-white p-1 transition group-hover:scale-[1.02]" />
+            <span class="absolute bottom-2 right-2 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-full pointer-events-none">
+              🔍 點擊放大
+            </span>
+          </div>
+        </div>
+
+        <div id="listeningPromptBanner" class="hidden w-full bg-amber-400/15 border border-amber-400/60 rounded-xl p-2.5 flex items-center justify-center gap-2">
+          <button onclick="speakCurrentQuestionEnglishOnly()" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-black flex items-center gap-2 shadow-lg animate-pulse">
+            🔊 點擊播放英語聽力 (Listen Again)
+          </button>
+        </div>
+
+        <p id="quizQuestionText" class="text-lg md:text-xl font-black text-amber-300 leading-snug"></p>
+
+        <div id="normalTtsControls" class="flex flex-wrap items-center justify-center gap-2">
+          <button onclick="speakCurrentQuestionEnglishOnly()" class="px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black flex items-center gap-1 shadow transition">
+            🔊 英語發音 (Listen)
+          </button>
+        </div>
+
+        <div id="quizChoicesContainer" class="hidden w-full grid-cols-1 gap-2 pt-1"></div>
+        <div id="choiceFeedbackBanner" class="hidden w-full py-2 px-3 rounded-xl font-black text-sm"></div>
+
+        <div id="quizAnswerBox" class="hidden w-full pt-3 border-t border-indigo-700/80 text-sm text-emerald-300 font-bold flex flex-col items-center gap-1.5">
+          <div>💡 正確解答：<span id="quizAnswerText" class="text-white text-base"></span></div>
+          <div id="quizAudioScriptReveal" class="hidden text-xs text-amber-200 bg-indigo-950/80 px-3 py-1 rounded-lg border border-indigo-700"></div>
+          <button onclick="speakCurrentAnswer()" class="px-3 py-1 rounded-full bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 text-xs font-bold border border-emerald-600/50">
+            🔊 朗讀英文解答
+          </button>
+        </div>
+      </div>
+
+      <button onclick="revealQuizAnswer()" id="revealAnsBtn" class="text-xs text-indigo-300 hover:text-white underline font-bold">
+        👀 顯示參考解答與聽力原文 (Show Answer)
+      </button>
+
+      <div id="manualJudgeBtns" class="grid grid-cols-2 gap-3 pt-1">
+        <button onclick="resolveQuiz(true)" class="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm shadow-lg transition">
+          ⭕ 答對了！過關 (Pass)
+        </button>
+        <button onclick="resolveQuiz(false)" class="py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-lg transition">
+          ❌ 再接再厲 (Try Again)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全螢幕圖片放大檢視器 -->
+  <div id="imageLightboxModal" onclick="closeImageLightbox()" class="no-print fixed inset-0 bg-black/95 z-[70] hidden items-center justify-center p-4 cursor-zoom-out">
+    <img id="lightboxImgEl" src="" alt="放大檢視" class="max-w-[95vw] max-h-[90vh] rounded-2xl border-4 border-white shadow-2xl object-contain bg-white p-2" />
+    <div class="fixed top-5 right-6 text-white bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full font-black text-sm">
+      ✕ 點擊任意處關閉放大
+    </div>
+  </div>
+
+  <!-- 彈出視窗 3：雙教材題庫管理與 Excel 匯入匯出中心 -->
+  <div id="quizEditorModal" class="no-print fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-2 md:p-4">
+    <div class="bg-slate-900 border-2 border-purple-500 rounded-3xl max-w-5xl w-full p-4 md:p-6 shadow-2xl space-y-3 max-h-[95vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div class="flex items-center gap-3 flex-wrap">
+          <h3 class="text-base md:text-lg font-black text-purple-300 flex items-center gap-2">
+            ✏️ 雙教材題庫 & Excel 管理中心
+          </h3>
+          <!-- 編輯器內也可直接切換教材 -->
+          <select id="editorBookSelector" onchange="switchTextbook(this.value)" class="bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-1 rounded-xl cursor-pointer">
+            <option value="SF5">📘 目前編輯：五年級 Super Fun 5</option>
+            <option value="WW3">📗 目前編輯：四年級 Wonder World 3</option>
+          </select>
+          <span id="editorStatsBadge" class="text-xs bg-purple-900/90 text-purple-200 px-2.5 py-0.5 rounded-full border border-purple-600 font-bold">共 50 題</span>
+        </div>
+        <button onclick="closeQuizEditor()" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/90 p-2.5 rounded-2xl border border-slate-800">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-xs font-bold text-slate-400 pl-1">抽題方式：</span>
+          <button onclick="setQuizAssignMode('cell')" id="modeBtn_cell" class="px-2.5 py-1.5 rounded-xl text-xs font-black transition">
+            🔢 指定格號綁定 (1~50格對應)
+          </button>
+          <button onclick="setQuizAssignMode('random')" id="modeBtn_random" class="px-2.5 py-1.5 rounded-xl text-xs font-black transition">
+            🎲 隨機不重複洗牌抽題
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <input type="file" id="quizExcelFileInput" accept=".xlsx,.xls,.csv,.txt" class="hidden" onchange="handleImportExcelFile(event)" />
+          <input type="file" id="singleImageInput" accept="image/*" class="hidden" onchange="handleSingleImageSelected(event)" />
+          <input type="file" id="batchImagesInput" accept="image/*" multiple class="hidden" onchange="handleBatchImagesSelected(event)" />
+
+          <button onclick="document.getElementById('quizExcelFileInput').click()" class="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-black border border-emerald-500 transition flex items-center gap-1 shadow">
+            📥 匯入 Excel (.xlsx)
+          </button>
+          <button onclick="exportQuestionsToExcel()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black border border-sky-400 transition flex items-center gap-1 shadow">
+            📤 匯出本冊 Excel
+          </button>
+          <button onclick="exportBothBooksToExcel()" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition flex items-center gap-1 shadow" title="將 WW3 與 Super Fun 5 同時打包成一份含有兩個分頁的 Excel 檔案">
+            📦 匯出 WW3+SF5 雙分頁 Excel
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <button onclick="switchEditorTab('visual')" id="tabBtn_visual" class="px-3 py-1 rounded-lg font-black transition flex items-center gap-1">
+            🖼️ 視覺化圖文與聽力清單
+          </button>
+          <button onclick="switchEditorTab('text')" id="tabBtn_text" class="px-3 py-1 rounded-lg font-black transition flex items-center gap-1">
+            📝 純文字快速編輯
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="document.getElementById('batchImagesInput').click()" class="px-2.5 py-1 rounded-lg bg-pink-700 hover:bg-pink-600 text-white font-bold border border-pink-500 transition flex items-center gap-1 shadow">
+            📂 批次上傳圖片配對
+          </button>
+          <button onclick="addNewVisualQuestionRow()" class="px-2.5 py-1 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white font-bold border border-indigo-500 transition">
+            ➕ 新增一題
+          </button>
+          <button onclick="clearAllQuestions()" class="px-2.5 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 font-bold border border-rose-800/60 transition">
+            🗑️ 清空
+          </button>
+        </div>
+      </div>
+
+      <div id="visualEditorContainer" class="flex-1 min-h-[260px] max-h-[48vh] overflow-y-auto bg-slate-950 border border-slate-800 rounded-2xl p-2 space-y-2"></div>
+
+      <div id="textEditorContainer" class="hidden flex-1 flex-col space-y-1.5">
+        <div class="text-[11px] text-slate-300 bg-slate-950/90 border border-slate-800 rounded-xl p-2 leading-relaxed">
+          💡 <b>純文字格式（一行一題，使用 <code class="text-amber-300 font-bold">|</code> 分隔）：</b><br/>
+          • <code class="text-emerald-300">格號(1~50) | 螢幕題幹與(A)(B)選項 | 參考解答 | 隱藏聽力音稿(選填) | 圖片代碼(選填)</code>
+        </div>
+        <textarea id="quizTextarea" rows="9" oninput="handleRawTextareaInput()" class="w-full bg-slate-950 border border-slate-700 rounded-2xl p-3 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-purple-400"></textarea>
+      </div>
+
+      <div class="flex flex-wrap justify-between items-center gap-2 pt-1 border-t border-slate-800">
+        <div class="flex items-center gap-2">
+          <button onclick="resetDefaultQuestions()" class="text-xs text-amber-300 hover:text-amber-200 underline font-bold">
+            🔄 恢復本冊預設 50 題無洩題專業題庫
+          </button>
+          <span id="copyToast" class="text-xs text-emerald-400 font-bold hidden">✅ 已處理完成！</span>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="closeQuizEditor()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold">關閉</button>
+          <button onclick="saveCustomQuestions()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black shadow-lg">💾 儲存題庫並套用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="exportCanvas" class="hidden"></canvas>
+
+  <script>
+    // =========================================================================
+    // 1. 遊戲常數與原圖 100% 對應配置 (4 條梯子、4 條滑動蛇)
+    // =========================================================================
+    const LADDERS = { 6: 14, 17: 23, 27: 33, 38: 43 };
+    const SNAKES  = { 16: 4, 29: 10, 39: 20, 45: 34 };
+    const BLUE_CELLS = new Set([6, 14, 17, 23, 27, 33, 38, 43]);
+    const RED_CELLS  = new Set([4, 16, 10, 29, 20, 39, 34, 45]);
+
+    const PAPER_SPECS = {
+      A4: { name: 'A4', mmW: 297, mmH: 210, pxW: 3508, pxH: 2480 },
+      B4: { name: 'B4', mmW: 364, mmH: 257, pxW: 4299, pxH: 3035 },
+      A3: { name: 'A3', mmW: 420, mmH: 297, pxW: 4961, pxH: 3508 }
+    };
+    let currentPaperSize = 'B4';
+
+    const PLAYER_CONFIGS = [
+      { id: 0, name: 'Team 1 小紅', color: '#ef4444', stroke: '#7f1d1d', badge: 'bg-rose-500' },
+      { id: 1, name: 'Team 2 小藍', color: '#3b82f6', stroke: '#1e3a8a', badge: 'bg-blue-500' },
+      { id: 2, name: 'Team 3 小黃', color: '#eab308', stroke: '#713f12', badge: 'bg-amber-500' },
+      { id: 3, name: 'Team 4 小紫', color: '#a855f7', stroke: '#4c1d95', badge: 'bg-purple-500' }
+    ];
+
+    let playerCount = 2;
+    let players = [];
+    let currentPlayerIdx = 0;
+    let isAnimating = false;
+    let soundEnabled = true;
+    let quizModeEnabled = true;
+    let pendingQuizCallback = null;
+
+    // 內建輕量 SVG 卡通圖卡產生器（100% 不顯示單元名稱、不洩漏答案單字）
+    function makeFlashcardSvg(emoji, bgColor, topTag, mainLabel) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="220" viewBox="0 0 360 220">
+        <rect width="360" height="220" rx="24" fill="${bgColor}" stroke="#cbd5e1" stroke-width="4"/>
+        <rect x="16" y="14" width="155" height="28" rx="14" fill="rgba(15,23,42,0.78)"/>
+        <text x="93" y="33" font-family="Fredoka, sans-serif" font-size="13" font-weight="bold" fill="#fde047" text-anchor="middle">${topTag}</text>
+        <circle cx="180" cy="104" r="54" fill="rgba(255,255,255,0.82)"/>
+        <text x="180" y="124" font-size="64" text-anchor="middle">${emoji}</text>
+        <text x="180" y="196" font-family="Fredoka, Arial, sans-serif" font-size="22" font-weight="bold" fill="#0f172a" text-anchor="middle">${mainLabel}</text>
+      </svg>`;
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    // =========================================================================
+    // 1B. 雙教材內建題庫：
+    //     (1) 五年級 Super Fun 5 (50題，無洩題、無單元名)
+    //     (2) 四年級 Wonder World 3 (50題，無洩題、無單元名)
+    // =========================================================================
+    const QUESTIONS_SF5 = [
+      // --- 第 1~10 格：ch / sh / wh / ph 聽辨與拼讀 ---
+      { cell: 1,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) chair (B) shell', a: '(A) chair (椅子 - ch 發音)', tts: 'chair, chair.', img: makeFlashcardSvg('🪑🐚', '#fef3c7', 'Listen & Choose', 'What do you hear?') },
+      { cell: 2,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) lunch (B) fish', a: '(A) lunch (午餐 - ch 發音)', tts: 'lunch, lunch.', img: makeFlashcardSvg('🍱🐟', '#e0f2fe', 'Listen & Choose', 'What do you hear?') },
+      { cell: 3,  q: '🎧 Listen and choose! Which word do you hear? (注意字尾發音) (A) watch (B) wash', a: '(A) watch (手錶 - ch 發音)', tts: 'watch, watch.', img: makeFlashcardSvg('⌚🚿', '#ede9fe', 'Listen & Choose', 'Listen carefully!') },
+      { cell: 4,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) witch (B) sheep', a: '(B) sheep (綿羊 - sh 發音)', tts: 'sheep, sheep.', img: makeFlashcardSvg('🧙‍♀️🐑', '#fce7f3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 5,  q: '🗣️ Read aloud these 4 words clearly! (大聲唸出這四個單字)："chair, shell, watch, wash"', a: 'chair (椅子), shell (貝殼), watch (手錶), wash (清洗)', tts: 'chair, shell, watch, wash.', img: makeFlashcardSvg('🗣️🔤', '#dcfce7', 'Read Aloud', 'Speak out loud!') },
+      { cell: 6,  q: '🪜 【梯子晉級題 6➔14】🗣️ Read aloud these 4 words to climb the ladder! (大聲唸出這四個單字即可爬梯子)："white, wheel, whale, whistle"', a: 'white (白色), wheel (輪子), whale (鯨魚), whistle (哨子)', tts: 'white, wheel, whale, whistle.', img: makeFlashcardSvg('🪜🐳', '#dcfce7', 'Ladder 6 ➔ 14', 'Read 4 words aloud!') },
+      { cell: 7,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) phone (B) white', a: '(A) phone (電話 - ph 發 [f] 的音)', tts: 'phone, phone.', img: makeFlashcardSvg('📱⚪', '#fef9c3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 8,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) photo (B) wheel', a: '(A) photo (照片 - ph 發 [f] 的音)', tts: 'photo, photo.', img: makeFlashcardSvg('📸🛞', '#e0e7ff', 'Listen & Choose', 'What do you hear?') },
+      { cell: 9,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) dolphin (B) whale', a: '(A) dolphin (海豚 - ph 在字中發 [f])', tts: 'dolphin, dolphin.', img: makeFlashcardSvg('🐬🐋', '#ffedd5', 'Listen & Choose', 'What do you hear?') },
+      { cell: 10, q: '👀 Look at the picture! What is this? (看圖選出正確的單字) (A) elephant (B) whistle', a: '(A) elephant (大象)', tts: 'Look at the picture. What is this?', img: makeFlashcardSvg('🐘', '#fef3c7', 'Look & Choose', 'What is this?') },
+
+      // --- 第 11~20 格：th 無聲/有聲, c & g 軟硬音 ---
+      { cell: 11, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) thin (B) this', a: '(A) thin (瘦的 - 無聲 th)', tts: 'thin, thin.', img: makeFlashcardSvg('🎧🔤', '#fef9c3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 12, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) three (B) that', a: '(A) three (數字三 - 無聲 th)', tts: 'three, three.', img: makeFlashcardSvg('🎧❓', '#dbeafe', 'Listen & Choose', 'Listen carefully!') },
+      { cell: 13, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) father (B) bath', a: '(A) father (父親 - 有聲 th)', tts: 'father, father.', img: makeFlashcardSvg('👨🛁', '#e0f2fe', 'Listen & Choose', 'What do you hear?') },
+      { cell: 14, q: '🗣️ Read aloud these 4 words! (大聲唸出這四個單字)："teeth, bath, father, mother"', a: 'teeth (牙齒), bath (泡澡), father (父親), mother (母親)', tts: 'teeth, bath, father, mother.', img: makeFlashcardSvg('🦷👨‍👩‍👧', '#fce7f3', 'Read Aloud', 'Speak out loud!') },
+      { cell: 15, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) car (B) cent', a: '(A) car (汽車 - c 發硬音 [k])', tts: 'car, car.', img: makeFlashcardSvg('🚗🪙', '#dcfce7', 'Listen & Choose', 'What do you hear?') },
+      { cell: 16, q: '🐍 【蛇頭救援題 16➔4】🎧 Listen carefully and choose the word you hear! (聽音選字，答對免滑落！) (A) candy (B) city', a: '(B) city (城市 - c 發軟音 [s])', tts: 'city, city.', img: makeFlashcardSvg('🐍🎧', '#ffe4e6', 'Snake Rescue 16', 'What do you hear?') },
+      { cell: 17, q: '🪜 【梯子晉級題 17➔23】🗣️ Read aloud these 4 words to climb the ladder! (大聲唸出這四個單字即可爬梯子)："picnic, music, pencil, Nancy"', a: 'picnic (野餐), music (音樂), pencil (鉛筆), Nancy (女子名)', tts: 'picnic, music, pencil, Nancy.', img: makeFlashcardSvg('🪜🎶', '#e0f2fe', 'Ladder 17 ➔ 23', 'Read 4 words aloud!') },
+      { cell: 18, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) gum (B) gem', a: '(B) gem (寶石 - g 發軟音 [dʒ])', tts: 'gem, gem.', img: makeFlashcardSvg('🍬💎', '#fef3c7', 'Listen & Choose', 'What do you hear?') },
+      { cell: 19, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) gate (B) giraffe', a: '(B) giraffe (長頸鹿 - g 發軟音 [dʒ])', tts: 'giraffe, giraffe.', img: makeFlashcardSvg('🚪🦒', '#f3e8ff', 'Listen & Choose', 'What do you hear?') },
+      { cell: 20, q: '🗣️ Read aloud these 4 words! (大聲唸出這四個單字)："pig, mug, gym, magic"', a: 'pig (豬), mug (馬克杯), gym (體育館), magic (魔術)', tts: 'pig, mug, gym, magic.', img: makeFlashcardSvg('🐷☕🏋️‍♂️✨', '#fae8ff', 'Read Aloud', 'Speak out loud!') },
+
+      // --- 第 21~30 格：星期推論與情境故事聽力理解 ---
+      { cell: 21, q: '🎧 Listen to the dialog! What day is today? (點喇叭聽對話，選出今天是星期幾) (A) It\'s Friday. (B) It\'s Saturday.', a: '(B) It\'s Saturday. (The Zookeeper Day! 動物園管理員日)', tts: 'Time to get up, Ken. What day is today, Mom? It\'s Saturday. The Zookeeper Day!', img: makeFlashcardSvg('🦁📅', '#fef3c7', 'Listen & Choose', 'What day is today?') },
+      { cell: 22, q: '🎧 Listen and choose! What day is today? (點喇叭聽句子，選出正確的星期) (A) It\'s Wednesday. (B) It\'s Thursday.', a: '(A) It\'s Wednesday. (今天是星期三)', tts: 'What day is today? It\'s Wednesday.', img: makeFlashcardSvg('🎧🗓️', '#e0e7ff', 'Listen & Choose', 'What day is today?') },
+      { cell: 23, q: '📖 Read and choose! "Is today Friday?" / "No, _______. It\'s Saturday." (A) it isn\'t (B) I don\'t', a: '(A) it isn\'t (No, it isn\'t. It\'s Saturday.)', tts: 'Is today Friday? No, it isn\'t. It\'s Saturday.', img: makeFlashcardSvg('❓📅', '#dcfce7', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 24, q: '🗣️ Recite the 7 days of the week from Sunday to Saturday! (依序大聲唸出星期日到星期六)', a: 'Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday', tts: 'Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday.', img: makeFlashcardSvg('🗓️🌟', '#e0f2fe', 'Speak Out Loud', '7 Days of the Week') },
+      { cell: 25, q: '🔢 Read and choose: Monday -> Tuesday -> _________ -> Thursday. What day is missing? (A) Wednesday (B) Friday', a: '(A) Wednesday (星期三)', tts: 'Monday, Tuesday, blank, Thursday.', img: makeFlashcardSvg('📅🔍', '#fce7f3', 'Read & Choose', 'Which day is missing?') },
+      { cell: 26, q: '🎧 Listen to the dialog! What time does Ken go to bed every Friday? (點喇叭聽時間) (A) At 9:00 (B) At 11:00', a: '(B) At 11:00 (I go to bed at 11:00 every Friday.)', tts: 'You look tired, Ken. What time do you go to bed? I go to bed at eleven o\'clock every Friday.', img: makeFlashcardSvg('😴🛏️', '#ffedd5', 'Listen & Choose', 'What time?') },
+      { cell: 27, q: '🪜 【梯子晉級題 27➔33】🗣️ Role-Play! (兩人一組用英文問答今天實際是星期幾即可爬梯子)：Q: "What day is today?" / A: "It\'s _________."', a: 'Q: What day is today? / A: It\'s Monday / Tuesday / Wednesday / Thursday / Friday.', tts: 'What day is today?', img: makeFlashcardSvg('🪜📅', '#e0f2fe', 'Ladder 27 ➔ 33', 'Ask & Answer!') },
+      { cell: 28, q: '🎧 Listen and choose! What time does the koala wake up and eat? (點喇叭聽時間) (A) At 12:30 (B) At 5:00 PM', a: '(B) At 5:00 PM (She wakes up and eats at 5:00 PM.)', tts: 'The koala is sleeping. She wakes up and eats at five PM.', img: makeFlashcardSvg('🐨🌿', '#fef9c3', 'Listen & Choose', 'What time?') },
+      { cell: 29, q: '🐍 【蛇頭救援題 29➔10】🎧 Listen carefully! How many hours a day do koalas sleep? (點喇叭聽句子，答對免滑落！) (A) 12 hours (B) 20 hours', a: '(B) 20 hours (Koalas sleep 20 hours a day.)', tts: 'Koalas sleep twenty hours a day.', img: makeFlashcardSvg('🐍🐨', '#ffe4e6', 'Snake Rescue 29', 'How many hours?') },
+      { cell: 30, q: '🎧 Listen and choose! What time does Turtle Tod eat lunch? (點喇叭聽時間) (A) At 11:00 (B) At 12:30', a: '(B) At 12:30 (He eats lunch at 12:30.)', tts: 'What time does Tod eat lunch? He eats lunch at twelve thirty.', img: makeFlashcardSvg('🐢🍽️', '#f3e8ff', 'Listen & Choose', 'What time?') },
+
+      // --- 第 31~40 格：日常作息與第三人稱單數文法 ---
+      { cell: 31, q: '👀 Look at the picture! It is morning. What daily routine is this? (A) get up (B) go to bed (C) go home', a: '(A) get up (起床)', tts: 'Look at the picture. What daily routine is this?', img: makeFlashcardSvg('🛌☀️', '#fef3c7', 'Look & Choose', 'What routine is this?') },
+      { cell: 32, q: '🎧 Listen and choose! What time do you get up? (點喇叭聽起床時間) (A) At 6:30 (B) At 6:50 (C) At 7:00', a: '(B) At 6:50 (I get up at 6:50.)', tts: 'What time do you get up? I get up at six fifty.', img: makeFlashcardSvg('🎧⏰', '#e0e7ff', 'Listen & Choose', 'What time?') },
+      { cell: 33, q: '📖 Read and choose! "What time ______ he go to school?" (主詞是 he，助動詞選哪一個？) (A) do (B) does', a: '(B) does (What time does he go to school?)', tts: 'What time does he go to school?', img: makeFlashcardSvg('👦🎒', '#dcfce7', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 34, q: '📖 Read and choose! "He ______ to school at 7:00." (注意第三人稱單數動詞變化！) (A) go (B) goes', a: '(B) goes (He goes to school at 7:00.)', tts: 'He goes to school at seven o\'clock.', img: makeFlashcardSvg('🏫🏃‍♂️', '#e0f2fe', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 35, q: '👀 Look at the picture! What does she do after school? (A) do homework (B) take a shower', a: '(A) do homework (做功課)', tts: 'Look at the picture. What does she do after school?', img: makeFlashcardSvg('📝📚', '#ffedd5', 'Look & Choose', 'What routine is this?') },
+      { cell: 36, q: '📖 Read and choose! "I eat dinner at 6:30. She ______ dinner at 6:30." (A) eat (B) eats', a: '(B) eats (第三人稱單數 eat 要加 s 變成 eats)', tts: 'She eats dinner at six thirty.', img: makeFlashcardSvg('🍽️👧', '#dcfce7', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 37, q: '👀 Look at the picture! What daily routine is this? (A) take a shower (B) go home', a: '(A) take a shower (洗澡；淋浴)', tts: 'Look at the picture. What daily routine is this?', img: makeFlashcardSvg('🚿🧼', '#fef9c3', 'Look & Choose', 'What routine is this?') },
+      { cell: 38, q: '🪜 【梯子晉級題 38➔43】🗣️ Ask & Answer! (兩人一組問答起床或睡覺時間即可爬梯子)：Q: "What time do you get up / go to bed?" / A: "I ______ at ___."', a: 'Q: What time do you get up? / A: I get up at 6:30.', tts: 'What time do you get up? I get up at six fifty.', img: makeFlashcardSvg('🪜⏰', '#e0f2fe', 'Ladder 38 ➔ 43', 'Ask & Answer!') },
+      { cell: 39, q: '🐍 【蛇頭救援題 39➔20】🎧 Listen carefully! What does he do at 9:30? (點喇叭聽句子，答對免滑落！) (A) He takes a shower. (B) He goes to bed.', a: '(B) He goes to bed. (He goes to bed at 9:30.)', tts: 'What time does he go to bed? He goes to bed at nine thirty.', img: makeFlashcardSvg('🐍🌙', '#ffe4e6', 'Snake Rescue 39', 'Listen carefully!') },
+      { cell: 40, q: '🗣️ Read these 5 verb pairs aloud! (大聲唸出這五組動詞變化)："do/does, go/goes, get/gets, eat/eats, take/takes"', a: 'do/does, go/goes, get/gets, eat/eats, take/takes', tts: 'do, does. go, goes. get, gets. eat, eats. take, takes.', img: makeFlashcardSvg('⭐🔤', '#f3e8ff', 'Speak Out Loud', 'Read 5 Verb Pairs!') },
+
+      // --- 第 41~50 格：天氣現象、學校科目與節慶文化 ---
+      { cell: 41, q: '🎧 Listen and choose! How\'s the weather today? "It\'s sunny but ______ here." (A) hot (B) cool (C) cold', a: '(B) cool (這裡天氣晴朗但是很涼爽)', tts: 'Wow! What a beautiful day! It\'s sunny but cool here.', img: makeFlashcardSvg('☀️🍃', '#fef9c3', 'Listen & Choose', 'How\'s the weather?') },
+      { cell: 42, q: '🎧 Listen and choose! "Is it hot?" / "No, it isn\'t. It\'s ______." (點喇叭聽句子選出正確天氣) (A) warm (B) rainy', a: '(A) warm (溫暖的)', tts: 'Is it hot? No, it isn\'t. It\'s warm.', img: makeFlashcardSvg('🌤️🌷', '#dcfce7', 'Listen & Choose', 'How\'s the weather?') },
+      { cell: 43, q: '📖 Read and choose! "Can we go fly a kite today?" / "Yes! It\'s ______. Let\'s go!" (放風箏需要什麼天氣？) (A) windy (B) rainy', a: '(A) windy (起風的)', tts: 'How\'s the weather? Is it windy? Yes, it is. It\'s windy. Let\'s go.', img: makeFlashcardSvg('🪁🌬️', '#e0f2fe', 'Read & Choose', 'Fly a kite!') },
+      { cell: 44, q: '🎧 Listen and choose! What do we need to make clouds? (點喇叭聽做雲朵實驗需要什麼) (A) Flowers and stones (B) Hot water and ice', a: '(B) Hot water and ice (熱水和冰塊)', tts: 'We need some hot water and ice to make clouds. Cool!', img: makeFlashcardSvg('☁️🧊', '#ffedd5', 'Listen & Choose', 'Make clouds!') },
+      { cell: 45, q: '🐍 【蛇頭救援題 45➔34】🎧 Listen carefully! What subjects does Wendy like? (點喇叭聽對話，答對免滑落！) (A) Art and science (B) Math and PE', a: '(A) Art and science (美術課與自然課)', tts: 'What subject do you like? Great! I like art. Science class is fun!', img: makeFlashcardSvg('🐍🎨🔬', '#ffe4e6', 'Snake Rescue 45', 'Listen carefully!') },
+      { cell: 46, q: '📖 Read and choose! "Do you have PE class on Monday?" / "No, I ______. I have PE class on Tuesday." (A) don\'t (B) doesn\'t', a: '(A) don\'t (No, I don\'t.)', tts: 'Do you have PE class on Monday? No, I don\'t. I have PE class on Tuesday.', img: makeFlashcardSvg('🏀📅', '#f3e8ff', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 47, q: '📖 Read and choose! "Does he have social studies class on Monday?" / "Yes, he ______." (A) do (B) does', a: '(B) does (Yes, he does.)', tts: 'Does he have social studies class on Monday? Yes, he does.', img: makeFlashcardSvg('🌍👦', '#fef3c7', 'Grammar Check', 'Fill in the blank!') },
+      { cell: 48, q: '🗣️ Read aloud these 6 school subjects! (大聲唸出這 6 個科目英文)："Chinese, English, math, music, art, PE"', a: 'Chinese (國語), English (英文), math (數學), music (音樂), art (美術), PE (體育)', tts: 'Chinese, English, math, music, art, P E.', img: makeFlashcardSvg('🏫📚', '#dcfce7', 'Speak Out Loud', 'Read 6 Subjects!') },
+      { cell: 49, q: '👀 Look at the red paper on the door! "What are these?" / "They are _________." (A) spring couplets (B) rice cake (C) hot pot', a: '(A) spring couplets (春聯)', tts: 'What are these? They are spring couplets.', img: makeFlashcardSvg('🧧🚪', '#fee2e2', 'Look & Choose', 'What are these?') },
+      { cell: 50, q: '🏆 【FINAL #50 終點大挑戰】🗣️ Name 2 New Year words (lion dance / firecrackers / hot pot / lucky money) and shout: "Happy Chinese New Year!"', a: 'lion dance (舞獅), firecrackers (鞭炮), hot pot (火鍋), lucky money (壓歲錢) — Happy Chinese New Year!', tts: 'Let\'s make the New Year\'s Eve dinner! Happy Chinese New Year!', img: makeFlashcardSvg('🏆🦁🧧🍲', '#fef08a', 'FINISH #50', 'Final Challenge!') }
+    ];
+
+    const QUESTIONS_WW3 = [
+      // --- 第 1~10 格：課堂指令、長短母音 a / a_e 與數字 11-20 (無單元名、圖片零洩題) ---
+      { cell: 1,  q: '🕺 Listen and DO! (點喇叭聽指令，全組做出正確動作！)', a: 'Raise your hand! (舉起你的手)', tts: 'Raise your hand! Raise your hand!', img: makeFlashcardSvg('🙋‍♂️', '#fef3c7', 'Listen & Do', 'Do the action!') },
+      { cell: 2,  q: '👀 Look at the picture! What does the teacher say? (A) Be quiet. (B) Louder, please.', a: '(A) Be quiet. (安靜)', tts: 'Look at the picture. What does the teacher say?', img: makeFlashcardSvg('🤫', '#e0f2fe', 'Look & Choose', 'What to say?') },
+      { cell: 3,  q: '🎧 Listen and choose! Which page number do you hear? (點喇叭聽一聽，翻到第幾頁？) (A) Page 12 (B) Page 15 (C) Page 20', a: '(A) Page 12 (Please turn to page twelve.)', tts: 'Please turn to page twelve. Page twelve.', img: makeFlashcardSvg('📖❓', '#ede9fe', 'Listen & Choose', 'Which page?') },
+      { cell: 4,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) cap (B) cape', a: '(B) cape (披風 - a_e 長母音)', tts: 'cape, cape.', img: makeFlashcardSvg('🧢🦸', '#fce7f3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 5,  q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) tap (B) tape', a: '(A) tap (水龍頭 - a 短母音)', tts: 'tap, tap.', img: makeFlashcardSvg('🚰📼', '#dcfce7', 'Listen & Choose', 'What do you hear?') },
+      { cell: 6,  q: '🪜 【梯子晉級題 6➔14】🗣️ Read aloud these 2 sentences to climb the ladder! (大聲朗讀這兩句課堂用語即可爬梯子)："Show me your homework. Go back to your seat."', a: 'Show me your homework. Go back to your seat.', tts: 'Show me your homework. Go back to your seat.', img: makeFlashcardSvg('🪜📚', '#dcfce7', 'Ladder 6 ➔ 14', 'Read Aloud!') },
+      { cell: 7,  q: '🔢 Read and choose: eleven + three = ? (算一算，選出正確答案) (A) thirteen (B) fourteen (C) fifteen', a: '(B) fourteen (11 + 3 = 14)', tts: 'eleven plus three equals?', img: makeFlashcardSvg('1️⃣1️⃣➕3️⃣', '#fef9c3', 'Number Math', '11 + 3 = ?') },
+      { cell: 8,  q: '🎧 Listen and choose! What is the next number? (點喇叭聽數數，下一個數字是什麼？) (A) seventeen (B) eighteen (C) nineteen', a: '(B) eighteen (15, 16, 17 -> 18)', tts: 'fifteen, sixteen, seventeen, blank.', img: makeFlashcardSvg('🎧🔢', '#e0e7ff', 'Listen & Choose', 'What is next?') },
+      { cell: 9,  q: '🗣️ Read aloud these 2 words clearly! (大聲唸出這兩個單字)："mat" & "mate"', a: 'mat (墊子) / mate (夥伴)', tts: 'mat, mate.', img: makeFlashcardSvg('🗣️🔤', '#ffedd5', 'Read Aloud', 'Speak out loud!') },
+      { cell: 10, q: '👀 Look at the number "20". Choose the right word! (A) twelve (B) twenty', a: '(B) twenty (二十)', tts: 'Look at the number. Choose the right word.', img: makeFlashcardSvg('2️⃣0️⃣', '#fef3c7', 'Look & Choose', 'What number is it?') },
+
+      // --- 第 11~20 格：天氣問答與長短母音 e / e_e ---
+      { cell: 11, q: '👀 Look at the picture! How\'s the weather? (A) It\'s sunny. (B) It\'s rainy.', a: '(A) It\'s sunny. (天氣晴朗)', tts: 'How\'s the weather?', img: makeFlashcardSvg('☀️😎', '#fef9c3', 'Look & Choose', 'How\'s the weather?') },
+      { cell: 12, q: '👀 Look at the picture! "No, it\'s ______." (A) cloudy (B) rainy (C) sunny', a: '(B) rainy (下雨了)', tts: 'Look at the picture. No, it\'s blank.', img: makeFlashcardSvg('🌧️☔', '#dbeafe', 'Look & Choose', 'How\'s the weather?') },
+      { cell: 13, q: '🎧 Listen and choose! How\'s the weather now? (點喇叭聽句子，選出正確天氣) (A) It\'s windy. (B) It\'s sunny.', a: '(A) It\'s windy. (颳風了！Oh, no! My cap!)', tts: 'It\'s windy! Oh, no! My cap!', img: makeFlashcardSvg('🌬️🧢', '#e0f2fe', 'Listen & Choose', 'How\'s the weather?') },
+      { cell: 14, q: '👀 Look at the snowman! How\'s the weather? (A) It\'s hot. (B) It\'s cold.', a: '(B) It\'s cold. (好冷喔)', tts: 'Look at the snowman! How\'s the weather?', img: makeFlashcardSvg('⛄❄️', '#e0f2fe', 'Look & Choose', 'How\'s the weather?') },
+      { cell: 15, q: '🎧 Listen and choose! What does the teacher say? (點喇叭聽一聽，老師說了什麼？) (A) 請排隊 (B) 請舉手', a: '(A) 請排隊 (Line up, please.)', tts: 'Line up, please. Line up, please.', img: makeFlashcardSvg('🚶‍♂️🚶‍♀️🚶‍♂️', '#dcfce7', 'Listen & Choose', 'What do you hear?') },
+      { cell: 16, q: '🐍 【蛇頭救援題 16➔4】🎧 Listen carefully! How\'s the weather in the dialog? (點喇叭聽對話，答對免滑落！) (A) It\'s sunny. (B) It\'s cloudy.', a: '(B) It\'s cloudy. (Look! It\'s cloudy.)', tts: 'How\'s the weather? Look! It\'s cloudy.', img: makeFlashcardSvg('🐍☁️', '#ffe4e6', 'Snake Rescue 16', 'Listen carefully!') },
+      { cell: 17, q: '🪜 【梯子晉級題 17➔23】🗣️ Ask and Answer! (看著窗外，兩人一組用英文問答即可爬梯子)：Q: "How\'s the weather?" / A: "It\'s ______."', a: 'Q: How\'s the weather? / A: It\'s sunny / cloudy / rainy / windy.', tts: 'How\'s the weather?', img: makeFlashcardSvg('🪜🌤️', '#e0f2fe', 'Ladder 17 ➔ 23', 'Ask & Answer!') },
+      { cell: 18, q: '📖 Read and choose! "Let\'s go to the park!" / "______! Let\'s go!" (A) I can\'t wait (B) I\'m sorry', a: '(A) I can\'t wait (我等不及了！)', tts: 'Let\'s go to the park! I can\'t wait! Let\'s go!', img: makeFlashcardSvg('🏞️🤩', '#fef3c7', 'Read & Choose', 'Fill in the blank!') },
+      { cell: 19, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) pet (B) Pete', a: '(B) Pete (長母音 e_e)', tts: 'Pete, Pete.', img: makeFlashcardSvg('🐶👦', '#f3e8ff', 'Listen & Choose', 'What do you hear?') },
+      { cell: 20, q: '🗣️ Read aloud these 3 words! (大聲唸出這三個發音字)："jet, Chinese, theme park"', a: 'jet (噴射機), Chinese (中文), theme park (主題樂園)', tts: 'jet, Chinese, theme park.', img: makeFlashcardSvg('✈️🎡', '#fae8ff', 'Read Aloud', 'Speak out loud!') },
+
+      // --- 第 21~30 格：時間、數字 15-50 與長短母音 i / i_e ---
+      { cell: 21, q: '🎧 Listen to the school bell! What time is it? (點喇叭聽時間，選出正確時鐘) (A) 4:00 (B) 4:15 (C) 4:50', a: '(A) 4:00 (Oh, it\'s four o\'clock. Time to go home.)', tts: 'Listen! It\'s the school bell. Oh, it\'s four o\'clock. Time to go home.', img: makeFlashcardSvg('🔔🏫', '#fef3c7', 'Listen & Choose', 'What time is it?') },
+      { cell: 22, q: '🔢 Read and choose! twenty -> thirty -> ______ -> fifty. (選出中間缺少的數字) (A) fourteen (B) forty', a: '(B) forty (四十 - f-o-r-t-y)', tts: 'twenty, thirty, blank, fifty.', img: makeFlashcardSvg('20➔30➔❓➔50', '#e0e7ff', 'Read & Choose', 'Which number is missing?') },
+      { cell: 23, q: '👀 Look at the clock: "12:30". What time is it? (A) It\'s twelve o\'clock. (B) It\'s twelve thirty.', a: '(B) It\'s twelve thirty. (十二點三十分)', tts: 'What time is it?', img: makeFlashcardSvg('🕧', '#dcfce7', 'Look & Choose', '12 : 30') },
+      { cell: 24, q: '👀 Look at the picture! "Look! It\'s a bird. That\'s a ______." (A) frog (B) dog', a: '(A) frog (那是一隻青蛙)', tts: 'Look! It\'s a bird. That\'s a blank.', img: makeFlashcardSvg('🐦🐸', '#dcfce7', 'Look & Choose', 'Fill in the blank!') },
+      { cell: 25, q: '🎧 Listen and choose! What time is it now? (點喇叭聽句子，選出正確時間) (A) 4:15 (B) 4:25 (C) 4:50', a: '(A) 4:15 (It\'s four fifteen. We must go home.)', tts: 'It\'s four fifteen. We must go home.', img: makeFlashcardSvg('🎧⌚', '#e0f2fe', 'Listen & Choose', 'What time is it?') },
+      { cell: 26, q: '📖 Read and choose: It\'s 4:50! You are late! What do you say to Mom? (A) Sorry, I\'m late, Mom. (B) Thank you, Mom.', a: '(A) Sorry, I\'m late, Mom. (媽媽，對不起我晚回來了)', tts: 'Sorry, I\'m late, Mom.', img: makeFlashcardSvg('🏃‍♂️🏠', '#ffedd5', 'Read & Choose', 'What do you say?') },
+      { cell: 27, q: '🪜 【梯子晉級題 27➔33】🗣️ Look at "04:50" and say! (兩人一組問答現在幾點即可爬梯子)：Q: "What time is it?" / A: "It\'s four fifty!"', a: 'Q: What time is it? / A: It\'s four fifty.', tts: 'What time is it? It\'s four fifty!', img: makeFlashcardSvg('🪜🕔', '#fce7f3', 'Ladder 27 ➔ 33', '04 : 50') },
+      { cell: 28, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) kit (B) kite', a: '(B) kite (風箏 - i_e 長母音)', tts: 'kite, kite.', img: makeFlashcardSvg('🧰🪁', '#fef9c3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 29, q: '🐍 【蛇頭救援題 29➔10】🎧 Listen carefully and choose the word you hear! (聽音選字，答對免滑落！) (A) pin (B) pine (C) win', a: '(B) pine (松樹 - i_e 長母音)', tts: 'pine, pine.', img: makeFlashcardSvg('🐍🌲', '#ffe4e6', 'Snake Rescue 29', 'What do you hear?') },
+      { cell: 30, q: '🗣️ Read aloud these 2 words! (大聲唸出這兩個單字)："win" & "wine"', a: 'win (贏) / wine (葡萄酒)', tts: 'win, wine.', img: makeFlashcardSvg('🏆🍷', '#f3e8ff', 'Read Aloud', 'Speak out loud!') },
+
+      // --- 第 31~40 格：文具單字、歸屬問答與長短母音 o / o_e ---
+      { cell: 31, q: '👀 Look at the picture! What is this? (A) A pencil (B) A marker (C) A ruler', a: '(A) A pencil (鉛筆)', tts: 'Look at the picture! What is this?', img: makeFlashcardSvg('✏️', '#fef3c7', 'Look & Choose', 'What is this?') },
+      { cell: 32, q: '👀 Look at the picture! "Is this your ruler?" (看圖回答：這是尺嗎？) (A) Yes, it is. (B) No, it\'s not. It\'s an eraser.', a: '(B) No, it\'s not. It\'s an eraser. (不，它是橡皮擦)', tts: 'Is this your ruler?', img: makeFlashcardSvg('🧼', '#e0e7ff', 'Look & Choose', 'Is this your ruler?') },
+      { cell: 33, q: '🎧 Listen and choose! What is the boy looking for? (點喇叭聽句子，選出他問的文具) (A) book (B) marker (C) pen', a: '(B) marker (Is this your marker?)', tts: 'Is this your marker? Is this your marker?', img: makeFlashcardSvg('🎧🖍️', '#fce7f3', 'Listen & Choose', 'What do you hear?') },
+      { cell: 34, q: '📖 Read and choose: It\'s NOT your pencil. "Let\'s take them to the ______." (A) Lost and Found (B) theme park', a: '(A) Lost and Found (失物招領處)', tts: 'Let\'s take them to the Lost and Found.', img: makeFlashcardSvg('📦🔍', '#dcfce7', 'Read & Choose', 'Fill in the blank!') },
+      { cell: 35, q: '🕺 Show and Say! Hold up 2 things on your desk and say the words! (拿起桌上任兩樣文具，大聲說出英文：book / pen / pencil / eraser / ruler / marker)', a: 'book, pen, pencil, eraser, ruler, marker (任兩樣)', tts: 'book, pen, pencil, eraser, ruler, marker.', img: makeFlashcardSvg('📖✒️📏', '#fef9c3', 'Show & Say', 'Name 2 items!') },
+      { cell: 36, q: '📖 Read and choose: "Let me help you." (我來幫你。) What do you say? (A) Thank you. (B) Watch out!', a: '(A) Thank you. (謝謝你)', tts: 'Let me help you.', img: makeFlashcardSvg('🤝📚', '#ffedd5', 'Read & Choose', 'What do you say?') },
+      { cell: 37, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) hop (B) hope', a: '(B) hope (希望 - o_e 長母音)', tts: 'hope, hope.', img: makeFlashcardSvg('🐇💫', '#e0f2fe', 'Listen & Choose', 'What do you hear?') },
+      { cell: 38, q: '🪜 【梯子晉級題 38➔43】🗣️ Role-Play! (拿起同學的一樣文具問答即可爬梯子)：Q: "Is this your pencil / eraser?" / A: "Yes, it is."', a: 'Q: Is this your pencil? / A: Yes, it is.', tts: 'Is this your pencil? Yes, it is.', img: makeFlashcardSvg('🪜✏️', '#e0f2fe', 'Ladder 38 ➔ 43', 'Ask & Answer!') },
+      { cell: 39, q: '🐍 【蛇頭救援題 39➔20】🎧 Listen carefully! What does Kevin say at the end? (點喇叭聽句子，答對免滑落！) (A) It\'s just a dream. (B) Time to go home.', a: '(A) It\'s just a dream. (Phew! 呼！這只是一場夢)', tts: 'What happened? Phew! It\'s just a dream.', img: makeFlashcardSvg('🐍💭', '#ffe4e6', 'Snake Rescue 39', 'Listen carefully!') },
+      { cell: 40, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) rob (B) robe (C) cod', a: '(B) robe (長袍 - o_e 長母音)', tts: 'robe, robe.', img: makeFlashcardSvg('🧥🔤', '#f3e8ff', 'Listen & Choose', 'What do you hear?') },
+
+      // --- 第 41~50 格：空間方位 in/on/under、防震掩護、長短母音 u / u_e 與萬聖節 ---
+      { cell: 41, q: '🕺 Hand Action! Use your hands to show and say: "IN, ON, UNDER!" (邊比動作邊大聲唸出 in 在裡面、on 在上面、under 在底下)', a: 'in (在…裡面), on (在…上面), under (在…底下)', tts: 'in, on, under!', img: makeFlashcardSvg('📦✋', '#fef9c3', 'Action TPR', 'Show & Say!') },
+      { cell: 42, q: '👀 Look at the picture! "Where\'s my schoolbag?" (A) It\'s on the chair. (B) It\'s under the desk.', a: '(A) It\'s on the chair. (它在椅子上面)', tts: 'Where\'s my schoolbag?', img: makeFlashcardSvg('🎒🪑', '#dcfce7', 'Look & Choose', 'Where is it?') },
+      { cell: 43, q: '📖 Read and choose: "Earthquake! Please take cover! Jello, get ______ the desk." (地震來了要躲哪裡？) (A) on (B) under', a: '(B) under (Get under the desk. 到書桌底下)', tts: 'Earthquake! Please take cover! Jello, get blank the desk.', img: makeFlashcardSvg('🚨🙇', '#fee2e2', 'Read & Choose', 'Fill in the blank!') },
+      { cell: 44, q: '🎧 Listen and choose! What does Boka need? (點喇叭聽 Boka 說什麼) (A) Give me a hand, please. (請幫我) (B) Be quiet. (安靜)', a: '(A) Give me a hand, please. (I\'m here. Give me a hand, please.)', tts: 'I\'m here. Give me a hand, please.', img: makeFlashcardSvg('🙋‍♂️🤝', '#ffedd5', 'Listen & Choose', 'What do you hear?') },
+      { cell: 45, q: '🐍 【蛇頭救援題 45➔34】🎧 Listen carefully! Where\'s the eraser? (點喇叭聽對話，選出橡皮擦的位置免滑落！) (A) It\'s in the box. (B) It\'s under the chair.', a: '(B) It\'s under the chair. (它在椅子底下)', tts: 'Where\'s the eraser? It\'s under the chair.', img: makeFlashcardSvg('🐍🪑', '#ffe4e6', 'Snake Rescue 45', 'Where is it?') },
+      { cell: 46, q: '🎧 Listen and choose! Which word do you hear? (聽音選字) (A) cut (B) cute', a: '(B) cute (可愛的 - u_e 長母音)', tts: 'cute, cute.', img: makeFlashcardSvg('✂️🐱', '#f3e8ff', 'Listen & Choose', 'What do you hear?') },
+      { cell: 47, q: '🗣️ Read aloud these 4 words! (大聲唸出這四個單字)："cub, cube, duck, duke"', a: 'cub (幼獸), cube (立方體), duck (鴨子), duke (公爵)', tts: 'cub, cube, duck, duke.', img: makeFlashcardSvg('🐻🧊🦆👑', '#fef3c7', 'Read Aloud', 'Speak out loud!') },
+      { cell: 48, q: '👀 Look at the picture! What is this? (看圖選出正確的單字) (A) a jack-o\'-lantern (B) a mummy (C) a witch', a: '(A) a jack-o\'-lantern (南瓜燈)', tts: 'Look at the picture! What is this?', img: makeFlashcardSvg('🎃', '#ffedd5', 'Look & Choose', 'What is this?') },
+      { cell: 49, q: '🗣️ Read aloud these 3 words! (看圖大聲唸出這三個單字)："a ghost, a vampire, a witch"', a: 'a ghost (鬼魂), a vampire (吸血鬼), a witch (女巫)', tts: 'a ghost, a vampire, a witch.', img: makeFlashcardSvg('👻🧛‍♂️🧙‍♀️', '#fae8ff', 'Read Aloud', 'Speak out loud!') },
+      { cell: 50, q: '🏆 【FINAL #50 終點大挑戰】🗣️ Shout out loud together: "Trick or treat! Happy Halloween!" (全組一起大聲喊出這兩句通關密語奪得總冠軍！)', a: 'Trick or treat! Happy Halloween! (恭喜奪得總冠軍！)', tts: 'Trick or treat! Happy Halloween!', img: makeFlashcardSvg('🏆🍬🎃', '#fef08a', 'FINISH #50', 'Final Challenge!') }
+    ];
+
+    const BOOK_CATALOG = {
+      SF5: {
+        id: 'SF5',
+        title: '五年級 Super Fun 5',
+        storageKey: 'snakes_dual_sf5_v1',
+        defaultQuestions: QUESTIONS_SF5,
+        sidebarTitle: '📘 五年級 Super Fun 5 指標分布',
+        scopes: [
+          '• <b>1~20格</b>：自然發音 (ch/sh/wh/ph/th/c/g)',
+          '• <b>21~30格</b>：星期推論與動物園故事聽力',
+          '• <b>31~40格</b>：日常作息與第三人稱單數文法',
+          '• <b>41~50格</b>：天氣現象、學校科目與農曆新年'
+        ]
+      },
+      WW3: {
+        id: 'WW3',
+        title: '四年級 Wonder World 3',
+        storageKey: 'snakes_dual_ww3_v1',
+        defaultQuestions: QUESTIONS_WW3,
+        sidebarTitle: '📗 四年級 Wonder World 3 指標分布',
+        scopes: [
+          '• <b>1~10格</b>：課堂指令、數字 11-20 與 a_e',
+          '• <b>11~20格</b>：天氣問答與長短母音 e / e_e',
+          '• <b>21~30格</b>：時間表達、10-50 與 i / i_e',
+          '• <b>31~40格</b>：文具歸屬問答與 o / o_e',
+          '• <b>41~50格</b>：空間方位 in/on/under、u_e 與萬聖節'
+        ]
+      }
+    };
+
+    let currentBookId = 'SF5';
+    let questionBank = JSON.parse(JSON.stringify(QUESTIONS_SF5));
+    let quizAssignMode = 'cell';
+    let randomDeck = [];
+    let currentActiveQuizItem = null;
+    let activeEditorTab = 'visual';
+    let targetUploadQuestionIndex = null;
+
+    const cellCenters = new Array(51);
+
+    // =========================================================================
+    // 2. 教材一鍵切換邏輯 (WW3 <-> Super Fun 5)
+    // =========================================================================
+    function switchTextbook(bookId) {
+      if (!BOOK_CATALOG[bookId]) return;
+      currentBookId = bookId;
+
+      // 同步兩個下拉選單的值
+      const topSel = document.getElementById('bookSelector');
+      const edSel = document.getElementById('editorBookSelector');
+      if (topSel && topSel.value !== bookId) topSel.value = bookId;
+      if (edSel && edSel.value !== bookId) edSel.value = bookId;
+
+      try {
+        localStorage.setItem('snakes_dual_active_book', bookId);
+      } catch (e) {}
+
+      loadSavedQuestionsForCurrentBook();
+      updateSidebarBookInfo();
+      renderCellBoundIndicators();
+
+      // 若題庫管理視窗正開啟中，同步刷新列表
+      const editorModal = document.getElementById('quizEditorModal');
+      if (editorModal && !editorModal.classList.contains('hidden')) {
+        if (activeEditorTab === 'visual') renderVisualEditorRows();
+        else document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+        updateEditorStatsUI();
+      }
+
+      document.getElementById('statusMsg').textContent = `已切換為「${BOOK_CATALOG[bookId].title}」50 題專業題庫！`;
+      playSound('step');
+    }
+
+    function updateSidebarBookInfo() {
+      const cfg = BOOK_CATALOG[currentBookId];
+      document.getElementById('sidebarBookTitle').textContent = cfg.sidebarTitle;
+      document.getElementById('sidebarScopeList').innerHTML = cfg.scopes.map(s => `<div>${s}</div>`).join('');
+    }
+
+    // =========================================================================
+    // 3. 高擬真語音引擎 (支援瀏覽器最佳 Natural 語音挑選 + 微軟 Azure Neural TTS API)
+    // =========================================================================
+    let availableVoices = [];
+    let selectedBrowserVoiceURI = '';
+    let voiceRate = 0.88;
+    let azureApiKey = '';
+    let azureRegion = 'eastasia';
+    let azureVoiceName = 'en-US-JennyNeural';
+    let currentAudioObj = null;
+
+    function initSpeechVoices() {
+      if (!('speechSynthesis' in window)) return;
+      function populate() {
+        const all = window.speechSynthesis.getVoices();
+        const enVoices = all.filter(v => /^en(-|_)/i.test(v.lang));
+        enVoices.sort((a, b) => {
+          const score = v => {
+            let s = 0;
+            if (/Natural|Online/i.test(v.name)) s += 50;
+            if (/Aria|Jenny|Ana|Guy|Google US English/i.test(v.name)) s += 30;
+            if (/en-US/i.test(v.lang)) s += 10;
+            return s;
+          };
+          return score(b) - score(a);
+        });
+        availableVoices = enVoices.length > 0 ? enVoices : all;
+
+        const sel = document.getElementById('browserVoiceSelect');
+        if (!sel) return;
+        sel.innerHTML = availableVoices.map(v => {
+          const isHigh = /Natural|Online|Google US/i.test(v.name);
+          return `<option value="${escapeHtmlAttr(v.voiceURI)}">${isHigh ? '⭐ ' : ''}${escapeHtmlAttr(v.name)} (${escapeHtmlAttr(v.lang)})</option>`;
+        }).join('');
+
+        if (selectedBrowserVoiceURI && availableVoices.some(v => v.voiceURI === selectedBrowserVoiceURI)) {
+          sel.value = selectedBrowserVoiceURI;
+        } else if (availableVoices.length > 0) {
+          selectedBrowserVoiceURI = availableVoices[0].voiceURI;
+          sel.value = selectedBrowserVoiceURI;
+        }
+        updateVoiceBadgeUI();
+      }
+      populate();
+      window.speechSynthesis.onvoiceschanged = populate;
+    }
+
+    function loadVoiceSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('sf5_voice_settings_v1') || '{}');
+        if (saved.browserVoiceURI) selectedBrowserVoiceURI = saved.browserVoiceURI;
+        if (saved.voiceRate) voiceRate = parseFloat(saved.voiceRate);
+        if (saved.azureApiKey) azureApiKey = saved.azureApiKey;
+        if (saved.azureRegion) azureRegion = saved.azureRegion;
+        if (saved.azureVoiceName) azureVoiceName = saved.azureVoiceName;
+
+        document.getElementById('voiceRateInput').value = voiceRate;
+        document.getElementById('rateValLabel').textContent = voiceRate;
+        document.getElementById('azureApiKeyInput').value = azureApiKey;
+        document.getElementById('azureRegionInput').value = azureRegion;
+        document.getElementById('azureVoiceNameSelect').value = azureVoiceName;
+      } catch (e) {}
+      updateVoiceBadgeUI();
+    }
+
+    function saveVoiceSettings() {
+      const sel = document.getElementById('browserVoiceSelect');
+      if (sel && sel.value) selectedBrowserVoiceURI = sel.value;
+      voiceRate = parseFloat(document.getElementById('voiceRateInput').value || '0.88');
+      azureApiKey = (document.getElementById('azureApiKeyInput').value || '').trim();
+      azureRegion = (document.getElementById('azureRegionInput').value || 'eastasia').trim();
+      azureVoiceName = document.getElementById('azureVoiceNameSelect').value || 'en-US-JennyNeural';
+
+      try {
+        localStorage.setItem('sf5_voice_settings_v1', JSON.stringify({
+          browserVoiceURI: selectedBrowserVoiceURI,
+          voiceRate,
+          azureApiKey,
+          azureRegion,
+          azureVoiceName
+        }));
+      } catch (e) {}
+      updateVoiceBadgeUI();
+    }
+
+    function updateVoiceBadgeUI() {
+      const badge = document.getElementById('voiceEngineBadge');
+      if (!badge) return;
+      if (azureApiKey && azureApiKey.length > 10) {
+        badge.textContent = 'Azure 真人語音';
+      } else {
+        const v = availableVoices.find(x => x.voiceURI === selectedBrowserVoiceURI);
+        const isNat = v && /Natural|Online|Google/i.test(v.name);
+        badge.textContent = isNat ? 'Natural 美語' : '語音設定';
+      }
+    }
+
+    function openVoiceSettings() {
+      const modal = document.getElementById('voiceSettingsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeVoiceSettings() {
+      const modal = document.getElementById('voiceSettingsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    async function speakEnglishText(text) {
+      if (!text) return;
+      if (currentAudioObj) {
+        currentAudioObj.pause();
+        currentAudioObj = null;
+      }
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+      if (azureApiKey && azureApiKey.length > 10 && azureRegion) {
+        try {
+          const ratePct = Math.round((voiceRate - 1.0) * 100);
+          const rateStr = (ratePct >= 0 ? `+${ratePct}%` : `${ratePct}%`);
+          const ssml = `<speak version='1.0' xml:lang='en-US'><voice xml:lang='en-US' name='${azureVoiceName}'><prosody rate='${rateStr}'>${escapeXml(text)}</prosody></voice></speak>`;
+          const resp = await fetch(`https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+            method: 'POST',
+            headers: {
+              'Ocp-Apim-Subscription-Key': azureApiKey,
+              'Content-Type': 'application/ssml+xml',
+              'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3'
+            },
+            body: ssml
+          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            currentAudioObj = new Audio(url);
+            currentAudioObj.onended = () => URL.revokeObjectURL(url);
+            currentAudioObj.play();
+            return;
+          }
+        } catch (err) {
+          console.warn('Azure TTS fallback to Web Speech API:', err);
+        }
+      }
+
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = voiceRate;
+        const matchedVoice = availableVoices.find(v => v.voiceURI === selectedBrowserVoiceURI);
+        if (matchedVoice) utter.voice = matchedVoice;
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    function escapeXml(unsafe) {
+      return String(unsafe).replace(/[<>&'"]/g, c => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+        }
+      });
+    }
+
+    function testVoicePlayback() {
+      speakEnglishText("How's the weather? It's sunny! What day is today? It's Saturday!");
+    }
+
+    // =========================================================================
+    // 4. Web Audio API 遊戲合成音效引擎
+    // =========================================================================
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        if (type === 'step') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(360, now);
+          osc.frequency.exponentialRampToValueAtTime(680, now + 0.08);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.09);
+        } else if (type === 'dice') {
+          for (let i = 0; i < 4; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(220 + i * 95, now + i * 0.055);
+            gain.gain.setValueAtTime(0.12, now + i * 0.055);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.045);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.055);
+            osc.stop(now + i * 0.055 + 0.05);
+          }
+        } else if (type === 'ladder') {
+          const notes = [330, 392, 493.88, 587.33, 659.25, 783.99];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+            gain.gain.setValueAtTime(0.2, now + idx * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.07);
+            osc.stop(now + idx * 0.07 + 0.17);
+          });
+        } else if (type === 'snake') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(130, now + 0.55);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.6);
+        } else if (type === 'win') {
+          const chord = [523.25, 659.25, 783.99, 1046.5];
+          chord.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            const start = now + idx * 0.1;
+            osc.frequency.setValueAtTime(freq, start);
+            gain.gain.setValueAtTime(0.22, start);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + 0.55);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 0.56);
+          });
+        }
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundText').textContent = soundEnabled ? '音效：開' : '音效：關';
+      if (soundEnabled) playSound('step');
+    }
+
+    // =========================================================================
+    // 5. 幾何曲線引擎：繪製 100% 貼合原圖的波浪與扇形彎道
+    // =========================================================================
+    function evalCubic(p0, p1, p2, p3, t) {
+      const mt = 1 - t;
+      const x = mt*mt*mt*p0.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p3.x;
+      const y = mt*mt*mt*p0.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*p3.y;
+      const dx = 3*mt*mt*(p1.x - p0.x) + 6*mt*t*(p2.x - p1.x) + 3*t*t*(p3.x - p2.x);
+      const dy = 3*mt*mt*(p1.y - p0.y) + 6*mt*t*(p2.y - p1.y) + 3*t*t*(p3.y - p2.y);
+      const len = Math.hypot(dx, dy) || 1;
+      return { x, y, tx: dx / len, ty: dy / len, nx: -dy / len, ny: dx / len };
+    }
+
+    function buildPiecewiseSampler(segments) {
+      const samples = [];
+      let totalLen = 0;
+      const stepsPerSeg = 300;
+      segments.forEach(seg => {
+        for (let i = 0; i <= stepsPerSeg; i++) {
+          if (samples.length > 0 && i === 0) continue;
+          const t = i / stepsPerSeg;
+          const pt = evalCubic(seg[0], seg[1], seg[2], seg[3], t);
+          if (samples.length > 0) {
+            const prev = samples[samples.length - 1];
+            totalLen += Math.hypot(pt.x - prev.x, pt.y - prev.y);
+          }
+          samples.push({ ...pt, s: totalLen });
+        }
+      });
+      function getAtFraction(u) {
+        const targetS = Math.max(0, Math.min(1, u)) * totalLen;
+        let low = 0, high = samples.length - 1;
+        while (low < high) {
+          const mid = (low + high) >> 1;
+          if (samples[mid].s < targetS) low = mid + 1;
+          else high = mid;
+        }
+        return samples[low];
+      }
+      return { samples, totalLen, getAtFraction };
+    }
+
+    const TRACK_SEGMENTS = [
+      [{x: 295, y: 830}, {x: 560, y: 882}, {x: 840, y: 890}, {x: 1085, y: 825}],
+      [{x: 1085, y: 825}, {x: 1228, y: 785}, {x: 1228, y: 668}, {x: 1085, y: 642}],
+      [{x: 1085, y: 642}, {x: 840, y: 602}, {x: 560, y: 612}, {x: 345, y: 648}],
+      [{x: 345, y: 648}, {x: 215, y: 668}, {x: 215, y: 515}, {x: 345, y: 492}],
+      [{x: 345, y: 492}, {x: 560, y: 458}, {x: 840, y: 482}, {x: 1085, y: 502}],
+      [{x: 1085, y: 502}, {x: 1228, y: 512}, {x: 1228, y: 365}, {x: 1085, y: 345}],
+      [{x: 1085, y: 345}, {x: 840, y: 312}, {x: 560, y: 348}, {x: 335, y: 345}],
+      [{x: 335, y: 345}, {x: 195, y: 342}, {x: 195, y: 205}, {x: 335, y: 185}],
+      [{x: 335, y: 185}, {x: 610, y: 162}, {x: 920, y: 205}, {x: 1185, y: 185}]
+    ];
+
+    const HALF_W = 54;
+
+    function renderEntireBoard() {
+      renderJungleFoliage();
+      const sampler = buildPiecewiseSampler(TRACK_SEGMENTS);
+      const boundaryFractions = [];
+      const totalWeight = 46 * 1.0 + 4 * 1.15;
+      let acc = 0;
+      boundaryFractions.push(0);
+      for (let i = 1; i <= 50; i++) {
+        const isApex = (i === 10 || i === 20 || i === 30 || i === 40);
+        acc += isApex ? 1.15 : 1.0;
+        boundaryFractions.push(acc / totalWeight);
+      }
+
+      const stickerLayer = document.getElementById('stickerOutlineLayer');
+      const darkRimLayer = document.getElementById('snakeDarkRimLayer');
+      const cellsLayer   = document.getElementById('cellsLayer');
+      const numbersLayer = document.getElementById('numbersLayer');
+
+      stickerLayer.innerHTML = '';
+      darkRimLayer.innerHTML = '';
+      cellsLayer.innerHTML = '';
+      numbersLayer.innerHTML = '';
+
+      const spinePoints = [];
+      for (let i = 0; i <= 260; i++) {
+        spinePoints.push(sampler.getAtFraction(i / 260));
+      }
+      const spinePathD = 'M ' + spinePoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+      const tailOutlineD = `M 1175,185 C 1225,178 1268,140 1288,88`;
+
+      stickerLayer.innerHTML = `
+        <path d="${spinePathD}" fill="none" stroke="#ffffff" stroke-width="${HALF_W * 2 + 42}" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="${tailOutlineD}" fill="none" stroke="#ffffff" stroke-width="82" stroke-linecap="round" />
+        <ellipse cx="195" cy="832" rx="108" ry="86" fill="#ffffff" />
+        <ellipse cx="1225" cy="142" rx="88" ry="96" fill="#ffffff" />
+      `;
+
+      darkRimLayer.innerHTML = `<path d="${spinePathD}" fill="none" stroke="#0c2618" stroke-width="${HALF_W * 2 + 14}" stroke-linecap="round" stroke-linejoin="round" />`;
+
+      for (let cellNum = 1; cellNum <= 50; cellNum++) {
+        const u0 = boundaryFractions[cellNum - 1];
+        const u1 = boundaryFractions[cellNum];
+        const subSteps = 10;
+        const topEdge = [];
+        const botEdge = [];
+
+        for (let s = 0; s <= subSteps; s++) {
+          const u = u0 + (u1 - u0) * (s / subSteps);
+          const pt = sampler.getAtFraction(u);
+          topEdge.push({ x: pt.x + pt.nx * HALF_W, y: pt.y + pt.ny * HALF_W });
+          botEdge.push({ x: pt.x - pt.nx * HALF_W, y: pt.y - pt.ny * HALF_W });
+        }
+
+        const midPt = sampler.getAtFraction((u0 + u1) * 0.5);
+        cellCenters[cellNum] = { x: midPt.x, y: midPt.y, nx: midPt.nx, ny: midPt.ny };
+
+        let fillColor = '#84cc16';
+        if (BLUE_CELLS.has(cellNum)) fillColor = '#38bdf8';
+        if (RED_CELLS.has(cellNum))  fillColor = '#f43f5e';
+
+        const polyPts = [
+          ...topEdge.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+          ...botEdge.reverse().map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+        ].join(' ');
+
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', polyPts);
+        poly.setAttribute('fill', fillColor);
+        poly.setAttribute('stroke', '#0c2618');
+        poly.setAttribute('stroke-width', '5.5');
+        poly.setAttribute('stroke-linejoin', 'round');
+        poly.setAttribute('class', 'board-cell');
+        poly.addEventListener('click', () => jumpPlayerToCell(cellNum));
+        cellsLayer.appendChild(poly);
+
+        let numOffsetX = 0, numOffsetY = 2;
+        if (cellNum === 6 || cellNum === 17 || cellNum === 27 || cellNum === 38) numOffsetY = 24;
+        if (cellNum === 14 || cellNum === 23 || cellNum === 33 || cellNum === 43) numOffsetY = -18;
+        if (cellNum === 16 || cellNum === 45) numOffsetY = -18;
+        if (cellNum === 4) numOffsetY = 24;
+
+        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        txt.setAttribute('x', (midPt.x + numOffsetX).toFixed(1));
+        txt.setAttribute('y', (midPt.y + numOffsetY).toFixed(1));
+        txt.setAttribute('class', 'board-number');
+        txt.textContent = cellNum;
+        numbersLayer.appendChild(txt);
+      }
+
+      const p50End = sampler.getAtFraction(1.0);
+      const tTopX = (p50End.x + p50End.nx * HALF_W).toFixed(1);
+      const tTopY = (p50End.y + p50End.ny * HALF_W).toFixed(1);
+      const tBotX = (p50End.x - p50End.nx * HALF_W).toFixed(1);
+      const tBotY = (p50End.y - p50End.ny * HALF_W).toFixed(1);
+
+      const tailTip = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      tailTip.setAttribute('d', `M ${tTopX},${tTopY} C 1225,130 1262,102 1290,74 C 1282,148 1245,212 ${tBotX},${tBotY} Z`);
+      tailTip.setAttribute('fill', '#84cc16');
+      tailTip.setAttribute('stroke', '#0c2618');
+      tailTip.setAttribute('stroke-width', '6.5');
+      tailTip.setAttribute('stroke-linejoin', 'round');
+      cellsLayer.appendChild(tailTip);
+
+      renderSnakeHeadAndTrophy();
+      renderLadders();
+      renderSnakes();
+      renderCellBoundIndicators();
+    }
+
+    function renderCellBoundIndicators() {
+      const oldBadges = document.querySelectorAll('.cell-quiz-badge');
+      oldBadges.forEach(el => el.remove());
+      if (quizAssignMode !== 'cell') return;
+
+      const numbersLayer = document.getElementById('numbersLayer');
+      questionBank.forEach(item => {
+        if (item.cell && item.cell >= 1 && item.cell <= 50 && cellCenters[item.cell]) {
+          const c = cellCenters[item.cell];
+          const badge = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          badge.setAttribute('x', (c.x + 25).toFixed(1));
+          badge.setAttribute('y', (c.y - 25).toFixed(1));
+          badge.setAttribute('font-size', '14');
+          badge.setAttribute('text-anchor', 'middle');
+          badge.setAttribute('class', 'cell-quiz-badge pointer-events-none');
+          const isListen = /🎧|Listen/i.test(item.q);
+          badge.textContent = isListen ? '🎧' : (item.img ? '🖼️' : '⭐');
+          numbersLayer.appendChild(badge);
+        }
+      });
+    }
+
+    function renderSnakeHeadAndTrophy() {
+      const layer = document.getElementById('headAndTrophyLayer');
+      layer.innerHTML = `
+        <g id="bigSnakeHead">
+          <path d="M 118,865 Q 82,876 62,892 M 85,876 Q 74,895 79,905" fill="none" stroke="#e11d48" stroke-width="4.5" stroke-linecap="round" />
+          <path d="M 302,775 C 268,735 212,728 168,756 C 122,785 95,808 98,846 C 102,882 162,896 228,892 C 266,890 292,885 302,884 Z" fill="#84cc16" stroke="#0c2618" stroke-width="6.5" stroke-linejoin="round" />
+          <path d="M 112,848 Q 180,876 258,854" fill="none" stroke="#152e1c" stroke-width="3.5" stroke-linecap="round" />
+          <circle cx="132" cy="832" r="3" fill="#152e1c" />
+          <circle cx="152" cy="836" r="3" fill="#152e1c" />
+          <ellipse cx="164" cy="770" rx="15" ry="20" fill="#ffffff" stroke="#0c2618" stroke-width="3.5" />
+          <ellipse cx="168" cy="772" rx="7" ry="11" fill="#0c2618" />
+          <circle cx="165" cy="767" r="3.2" fill="#ffffff" />
+          <ellipse cx="204" cy="788" rx="18" ry="23" fill="#ffffff" stroke="#0c2618" stroke-width="4" />
+          <ellipse cx="206" cy="790" rx="8.5" ry="13" fill="#0c2618" />
+          <circle cx="203" cy="784" r="4" fill="#ffffff" />
+          <g transform="translate(262, 875) rotate(7)">
+            <text x="0" y="0" font-family="Fredoka, Arial Black, sans-serif" font-weight="900" font-size="38" text-anchor="middle" fill="#1d4ed8" stroke="#ffffff" stroke-width="11" paint-order="stroke fill" stroke-linejoin="round">START</text>
+            <text x="0" y="0" font-family="Fredoka, Arial Black, sans-serif" font-weight="900" font-size="38" text-anchor="middle" fill="#2563eb" stroke="#0f172a" stroke-width="3" paint-order="stroke fill">START</text>
+          </g>
+        </g>
+        <g id="finishTrophyGroup" transform="translate(1222, 118) rotate(-8)">
+          <path d="M -38,-42 C -58,-42 -60,-5 -30,8" fill="none" stroke="#0c2618" stroke-width="11" stroke-linecap="round" />
+          <path d="M -38,-42 C -58,-42 -60,-5 -30,8" fill="none" stroke="url(#goldGrad)" stroke-width="5.5" stroke-linecap="round" />
+          <path d="M 38,-42 C 58,-42 60,-5 30,8" fill="none" stroke="#0c2618" stroke-width="11" stroke-linecap="round" />
+          <path d="M 38,-42 C 58,-42 60,-5 30,8" fill="none" stroke="url(#goldGrad)" stroke-width="5.5" stroke-linecap="round" />
+          <path d="M -40,-52 L 40,-52 L 28,12 C 22,28 -22,28 -28,12 Z" fill="url(#goldGrad)" stroke="#0c2618" stroke-width="5" stroke-linejoin="round" />
+          <rect x="-10" y="20" width="20" height="24" rx="3" fill="url(#goldGrad)" stroke="#0c2618" stroke-width="4.5" />
+          <path d="M -32,44 L 32,44 L 38,64 L -38,64 Z" fill="url(#goldGrad)" stroke="#0c2618" stroke-width="5" stroke-linejoin="round" />
+          <g transform="translate(5, 108) rotate(2)">
+            <text x="0" y="0" font-family="Fredoka, Arial Black, sans-serif" font-weight="900" font-size="37" text-anchor="middle" fill="#be185d" stroke="#ffffff" stroke-width="11" paint-order="stroke fill" stroke-linejoin="round">FINISH</text>
+            <text x="0" y="0" font-family="Fredoka, Arial Black, sans-serif" font-weight="900" font-size="37" text-anchor="middle" fill="#ec4899" stroke="#4a044e" stroke-width="3.5" paint-order="stroke fill">FINISH</text>
+          </g>
+        </g>
+      `;
+    }
+
+    function renderLadders() {
+      const layer = document.getElementById('laddersLayer');
+      layer.innerHTML = '';
+      const specs = [
+        { from: 6,  to: 14, color: '#6366f1', dark: '#312e81', rungs: 4, sOff: {x: 0, y: -12}, eOff: {x: 0, y: 16} },
+        { from: 17, to: 23, color: '#f59e0b', dark: '#78350f', rungs: 4, sOff: {x: 0, y: -12}, eOff: {x: 0, y: 16} },
+        { from: 27, to: 33, color: '#ec4899', dark: '#831843', rungs: 4, sOff: {x: 0, y: -12}, eOff: {x: 0, y: 16} },
+        { from: 38, to: 43, color: '#38bdf8', dark: '#0c4a6e', rungs: 4, sOff: {x: 0, y: -12}, eOff: {x: 0, y: 16} }
+      ];
+
+      specs.forEach(sp => {
+        const p1 = { x: cellCenters[sp.from].x + sp.sOff.x, y: cellCenters[sp.from].y + sp.sOff.y };
+        const p2 = { x: cellCenters[sp.to].x + sp.eOff.x,   y: cellCenters[sp.to].y + sp.eOff.y };
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        const halfRail = 19;
+        const l1x = p1.x + nx * halfRail, l1y = p1.y + ny * halfRail;
+        const l2x = p2.x + nx * halfRail, l2y = p2.y + ny * halfRail;
+        const r1x = p1.x - nx * halfRail, r1y = p1.y - ny * halfRail;
+        const r2x = p2.x - nx * halfRail, r2y = p2.y - ny * halfRail;
+
+        let rungsHtml = '';
+        for (let i = 1; i <= sp.rungs; i++) {
+          const t = i / (sp.rungs + 1);
+          const rx1 = l1x + (l2x - l1x) * t, ry1 = l1y + (l2y - l1y) * t;
+          const rx2 = r1x + (r2x - r1x) * t, ry2 = r1y + (r2y - r1y) * t;
+          rungsHtml += `
+            <line x1="${rx1.toFixed(1)}" y1="${ry1.toFixed(1)}" x2="${rx2.toFixed(1)}" y2="${ry2.toFixed(1)}" stroke="${sp.dark}" stroke-width="11" stroke-linecap="round" />
+            <line x1="${rx1.toFixed(1)}" y1="${ry1.toFixed(1)}" x2="${rx2.toFixed(1)}" y2="${ry2.toFixed(1)}" stroke="${sp.color}" stroke-width="6" stroke-linecap="round" />
+          `;
+        }
+        layer.innerHTML += `
+          <g>
+            ${rungsHtml}
+            <line x1="${l1x.toFixed(1)}" y1="${l1y.toFixed(1)}" x2="${l2x.toFixed(1)}" y2="${l2y.toFixed(1)}" stroke="${sp.dark}" stroke-width="13" stroke-linecap="round" />
+            <line x1="${l1x.toFixed(1)}" y1="${l1y.toFixed(1)}" x2="${l2x.toFixed(1)}" y2="${l2y.toFixed(1)}" stroke="${sp.color}" stroke-width="7.5" stroke-linecap="round" />
+            <line x1="${r1x.toFixed(1)}" y1="${r1y.toFixed(1)}" x2="${r2x.toFixed(1)}" y2="${r2y.toFixed(1)}" stroke="${sp.dark}" stroke-width="13" stroke-linecap="round" />
+            <line x1="${r1x.toFixed(1)}" y1="${r1y.toFixed(1)}" x2="${r2x.toFixed(1)}" y2="${r2y.toFixed(1)}" stroke="${sp.color}" stroke-width="7.5" stroke-linecap="round" />
+          </g>
+        `;
+      });
+    }
+
+    function renderSnakes() {
+      const layer = document.getElementById('snakesLayer');
+      layer.innerHTML = '';
+      const p16 = cellCenters[16], p4  = cellCenters[4];
+      const p29 = cellCenters[29], p10 = cellCenters[10];
+      const p39 = cellCenters[39], p20 = cellCenters[20];
+      const p45 = cellCenters[45], p34 = cellCenters[34];
+
+      const snakeConfigs = [
+        { head: { x: p16.x - 4, y: p16.y + 18, angle: 75 }, color: '#ec4899', rim: '#500724', path: `M ${p16.x - 4},${p16.y + 18} C ${p16.x - 32},${p16.y + 68} ${p4.x + 38},${p4.y - 75} ${p4.x + 8},${p4.y - 18}` },
+        { head: { x: p29.x + 28, y: p29.y + 4, angle: 82 }, color: '#60a5fa', rim: '#172554', path: `M ${p29.x + 28},${p29.y + 4} C ${p29.x + 95},${p29.y + 58} ${p10.x + 15},${p10.y - 140} ${p10.x + 95},${p10.y - 58} C ${p10.x + 145},${p10.y - 10} ${p10.x + 48},${p10.y - 15} ${p10.x + 18},${p10.y - 18}` },
+        { head: { x: p39.x - 18, y: p39.y + 22, angle: 125 }, color: '#a855f7', rim: '#3b0764', path: `M ${p39.x - 18},${p39.y + 22} C ${p39.x - 95},${p39.y + 52} ${p39.x - 30},${p39.y + 125} ${p39.x - 115},${p39.y + 155} C ${p20.x - 125},${p20.y - 25} ${p20.x - 55},${p20.y - 5} ${p20.x - 24},${p20.y - 12}` },
+        { head: { x: p45.x, y: p45.y + 14, angle: 88 }, color: '#f97316', rim: '#431407', path: `M ${p45.x},${p45.y + 14} C ${p45.x - 10},${p45.y + 115} ${p34.x - 15},${p34.y - 95} ${p34.x + 6},${p34.y - 8}` }
+      ];
+
+      snakeConfigs.forEach(sn => {
+        layer.innerHTML += `
+          <g>
+            <path d="${sn.path}" fill="none" stroke="${sn.rim}" stroke-width="21" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="${sn.path}" fill="none" stroke="${sn.color}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="${sn.path}" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6 10" stroke-linecap="round" opacity="0.45" />
+            <g transform="translate(${sn.head.x.toFixed(1)}, ${sn.head.y.toFixed(1)}) rotate(${sn.head.angle})">
+              <path d="M -18,0 L -29,-6 M -18,0 L -29,6" stroke="#e11d48" stroke-width="2.8" stroke-linecap="round" />
+              <ellipse cx="0" cy="0" rx="16" ry="12" fill="${sn.color}" stroke="${sn.rim}" stroke-width="3.8" />
+              <circle cx="-5" cy="-4.5" r="2.8" fill="#ffffff" /><circle cx="-5.5" cy="-4.5" r="1.4" fill="#000000" />
+              <circle cx="-5" cy="4.5" r="2.8" fill="#ffffff" /><circle cx="-5.5" cy="4.5" r="1.4" fill="#000000" />
+            </g>
+          </g>
+        `;
+      });
+    }
+
+    function renderJungleFoliage() {
+      const layer = document.getElementById('jungleFoliageLayer');
+      function palmFrond(x, y, scale, rot, fill) {
+        let blades = '';
+        for (let i = -5; i <= 5; i++) {
+          const yPos = i * 18, bLen = 85 - Math.abs(i) * 8;
+          blades += `<path d="M 0,${yPos} Q ${bLen*0.5},${yPos-14} ${bLen},${yPos-4} Q ${bLen*0.5},${yPos+8} 0,${yPos+5} Z" fill="${fill}" />`;
+          blades += `<path d="M 0,${yPos} Q ${-bLen*0.5},${yPos-14} ${-bLen},${yPos-4} Q ${-bLen*0.5},${yPos+8} 0,${yPos+5} Z" fill="${fill}" />`;
+        }
+        return `<g transform="translate(${x},${y}) rotate(${rot}) scale(${scale})"><path d="M 0,110 L 0,-110" stroke="${fill}" stroke-width="6" stroke-linecap="round" />${blades}</g>`;
+      }
+      function monsteraLeaf(x, y, scale, rot, fill, vein) {
+        return `<g transform="translate(${x},${y}) rotate(${rot}) scale(${scale})"><path d="M 0,95 C -65,85 -95,30 -88,-25 C -60,-18 -40,-10 -25,-5 C -45,-35 -75,-55 -65,-85 C -35,-88 -12,-70 0,-95 C 12,-70 35,-88 65,-85 C 75,-55 45,-35 25,-5 C 40,-10 60,-18 88,-25 C 95,30 65,85 0,95 Z" fill="${fill}" /><path d="M 0,95 L 0,-85 M 0,35 L -48,10 M 0,35 L 48,10 M 0,-15 L -40,-38 M 0,-15 L 40,-38" stroke="${vein}" stroke-width="3.5" stroke-linecap="round" opacity="0.55" /></g>`;
+      }
+      layer.innerHTML = [
+        palmFrond(70, 290, 1.55, 28, '#2d7a47'), palmFrond(1210, 65, 1.65, -35, '#2d7a47'),
+        palmFrond(1340, 460, 1.45, -65, '#74c67a'), palmFrond(950, 950, 1.5, 75, '#3b945e'),
+        palmFrond(340, 955, 1.35, -55, '#52b788'), palmFrond(490, 35, 1.35, 45, '#52b788'),
+        monsteraLeaf(195, 70, 1.45, -18, '#40916c', '#1b4332'), monsteraLeaf(660, 48, 1.25, 14, '#52b788', '#1b4332'),
+        monsteraLeaf(62, 680, 1.5, 22, '#40916c', '#1b4332'), monsteraLeaf(85, 920, 1.35, 48, '#2d6a4f', '#1b4332'),
+        monsteraLeaf(1310, 825, 1.6, -28, '#40916c', '#1b4332'), monsteraLeaf(1210, 955, 1.3, 15, '#2d6a4f', '#1b4332'),
+        monsteraLeaf(630, 965, 1.2, -12, '#74c67a', '#2d6a4f'), monsteraLeaf(1345, 240, 1.25, -40, '#52b788', '#1b4332')
+      ].join('');
+    }
+
+    function initPlayers() {
+      players = [];
+      for (let i = 0; i < playerCount; i++) {
+        players.push({ ...PLAYER_CONFIGS[i], pos: 1 });
+      }
+      currentPlayerIdx = 0;
+      renderPlayersStatusUI();
+      renderPawnsOnBoard();
+      updateTurnBanner();
+    }
+
+    function setPlayerCount(count) {
+      if (isAnimating) return;
+      playerCount = count;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`pBtn${i}`);
+        if (i === count) {
+          btn.className = 'px-2 py-1 rounded-lg text-xs font-black bg-lime-400 text-slate-950 shadow transition';
+        } else {
+          btn.className = 'px-2 py-1 rounded-lg text-xs font-black text-emerald-200 hover:bg-emerald-800 transition';
+        }
+      }
+      initPlayers();
+      playSound('step');
+    }
+
+    function renderPlayersStatusUI() {
+      const container = document.getElementById('playersStatusList');
+      container.innerHTML = players.map((p, idx) => {
+        const isTurn = (idx === currentPlayerIdx);
+        return `
+          <div class="flex items-center justify-between px-3 py-2 rounded-xl border transition ${isTurn ? 'bg-emerald-800/90 border-amber-400 shadow-md scale-[1.02]' : 'bg-emerald-950/60 border-emerald-800/70 opacity-80'}">
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 rounded-full inline-block border border-white" style="background:${p.color}"></span>
+              <span class="text-xs font-black text-white">${p.name}</span>
+              ${isTurn ? '<span class="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black">輪次</span>' : ''}
+            </div>
+            <span class="text-xs font-black text-amber-300">第 ${p.pos} 格</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPawnsOnBoard() {
+      const layer = document.getElementById('pawnsLayer');
+      layer.innerHTML = '';
+      const cellGroups = {};
+      players.forEach(p => {
+        if (!cellGroups[p.pos]) cellGroups[p.pos] = [];
+        cellGroups[p.pos].push(p);
+      });
+      const offsets = {
+        1: [{dx: 0, dy: -8}],
+        2: [{dx: -14, dy: -8}, {dx: 14, dy: -8}],
+        3: [{dx: -15, dy: -14}, {dx: 15, dy: -14}, {dx: 0, dy: 8}],
+        4: [{dx: -15, dy: -15}, {dx: 15, dy: -15}, {dx: -15, dy: 9}, {dx: 15, dy: 9}]
+      };
+      players.forEach(p => {
+        const group = cellGroups[p.pos];
+        const idxInCell = group.indexOf(p);
+        const off = offsets[group.length][idxInCell];
+        const center = cellCenters[p.pos] || { x: 300, y: 830 };
+        const x = center.x + off.dx, y = center.y + off.dy;
+        const isCurrent = (p.id === currentPlayerIdx);
+        layer.innerHTML += `
+          <g id="pawn_${p.id}" class="pawn-group" transform="translate(${x.toFixed(1)}, ${y.toFixed(1)})" filter="url(#pawnShadow)">
+            ${isCurrent ? `<circle cx="0" cy="0" r="22" fill="none" stroke="#fde047" stroke-width="3.5" stroke-dasharray="5 4" />` : ''}
+            <path d="M -13,12 L 13,12 L 8,-8 L -8,-8 Z" fill="${p.color}" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />
+            <circle cx="0" cy="-14" r="9.5" fill="${p.color}" stroke="#ffffff" stroke-width="2.5" />
+            <text x="0" y="7" font-family="Fredoka, sans-serif" font-size="11" font-weight="900" fill="#ffffff" text-anchor="middle">P${p.id + 1}</text>
+          </g>
+        `;
+      });
+    }
+
+    function updateTurnBanner() {
+      const p = players[currentPlayerIdx];
+      document.getElementById('turnBanner').textContent = `輪到：${p.name}（目前在第 ${p.pos} 格）`;
+    }
+
+    function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+    async function rollDice() {
+      if (isAnimating) return;
+      isAnimating = true;
+      const diceEl = document.getElementById('diceVisual');
+      const statusEl = document.getElementById('statusMsg');
+      diceEl.classList.add('dice-rolling');
+      playSound('dice');
+      const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+      for (let i = 0; i < 7; i++) {
+        diceEl.textContent = diceFaces[Math.floor(Math.random() * 6)];
+        await sleep(55);
+      }
+      const roll = Math.floor(Math.random() * 6) + 1;
+      diceEl.classList.remove('dice-rolling');
+      diceEl.textContent = roll;
+      const p = players[currentPlayerIdx];
+      statusEl.textContent = `${p.name} 擲出了 ${roll} 點！前進中...`;
+
+      let target = p.pos + roll;
+      if (target > 50) target = 50;
+
+      for (let step = p.pos + 1; step <= target; step++) {
+        p.pos = step;
+        playSound('step');
+        renderPawnsOnBoard();
+        renderPlayersStatusUI();
+        await sleep(230);
+      }
+      await checkSpecialCellAndQuiz(p);
+    }
+
+    async function checkSpecialCellAndQuiz(p) {
+      const statusEl = document.getElementById('statusMsg');
+      if (LADDERS[p.pos]) {
+        const dest = LADDERS[p.pos];
+        if (quizModeEnabled) {
+          const pass = await askQuizQuestion(`🪜 踩到第 ${p.pos} 格梯子！完成挑戰即可爬升至第 ${dest} 格！`, 'ladder', p.pos);
+          if (pass) {
+            statusEl.textContent = `🎉 Great job! ${p.name} 順著梯子爬升到第 ${dest} 格！`;
+            playSound('ladder');
+            p.pos = dest;
+            renderPawnsOnBoard();
+            renderPlayersStatusUI();
+            await sleep(450);
+          } else {
+            statusEl.textContent = `😅 可惜未過關，${p.name} 停留在第 ${p.pos} 格。`;
+          }
+        } else {
+          statusEl.textContent = `🪜 好運氣！${p.name} 從第 ${p.pos} 格爬梯子直達第 ${dest} 格！`;
+          playSound('ladder');
+          p.pos = dest;
+          renderPawnsOnBoard();
+          renderPlayersStatusUI();
+          await sleep(450);
+        }
+      } else if (SNAKES[p.pos]) {
+        const dest = SNAKES[p.pos];
+        if (quizModeEnabled) {
+          const pass = await askQuizQuestion(`🐍 踩到第 ${p.pos} 格蛇頭！答對聽力救援題可免除滑落！`, 'snake', p.pos);
+          if (pass) {
+            statusEl.textContent = `🛡️ Nice! 救援成功！${p.name} 安全留在第 ${p.pos} 格！`;
+          } else {
+            statusEl.textContent = `🐍 Oh, no! ${p.name} 被蛇滑回第 ${dest} 格！`;
+            playSound('snake');
+            p.pos = dest;
+            renderPawnsOnBoard();
+            renderPlayersStatusUI();
+            await sleep(450);
+          }
+        } else {
+          statusEl.textContent = `🐍 哎呀！${p.name} 在第 ${p.pos} 格踩到蛇頭，滑回第 ${dest} 格！`;
+          playSound('snake');
+          p.pos = dest;
+          renderPawnsOnBoard();
+          renderPlayersStatusUI();
+          await sleep(450);
+        }
+      } else if (quizModeEnabled) {
+        const pass = await askQuizQuestion(`📍 抵達第 ${p.pos} 格！請完成英文挑戰：`, 'normal', p.pos);
+        statusEl.textContent = pass ? `👏 Nice! ${p.name} 答對了，表現超棒！` : `💪 Good try! 下次再接再厲！`;
+      }
+
+      if (p.pos === 50) {
+        playSound('win');
+        statusEl.innerHTML = `<span class="text-amber-300 font-black">🏆 恭喜 ${p.name} 抵達第 50 格奪得冠軍獎盃！</span>`;
+        isAnimating = false;
+        return;
+      }
+
+      currentPlayerIdx = (currentPlayerIdx + 1) % playerCount;
+      renderPlayersStatusUI();
+      renderPawnsOnBoard();
+      updateTurnBanner();
+      isAnimating = false;
+    }
+
+    async function jumpPlayerToCell(cellNum) {
+      if (isAnimating) return;
+      const p = players[currentPlayerIdx];
+      p.pos = cellNum;
+      playSound('step');
+      renderPawnsOnBoard();
+      renderPlayersStatusUI();
+      document.getElementById('statusMsg').textContent = `已將 ${p.name} 移至第 ${cellNum} 格並觸發該格題目。`;
+      await checkSpecialCellAndQuiz(p);
+    }
+
+    function resetGame() {
+      if (isAnimating) return;
+      document.getElementById('diceVisual').textContent = '🎲';
+      document.getElementById('statusMsg').textContent = '新一局開始！請點擊擲骰子前進！';
+      initPlayers();
+      playSound('step');
+    }
+
+    // =========================================================================
+    // 6. 雙教材題庫各自獨立讀寫與儲存
+    // =========================================================================
+    function loadSavedQuestionsForCurrentBook() {
+      const cfg = BOOK_CATALOG[currentBookId];
+      questionBank = JSON.parse(JSON.stringify(cfg.defaultQuestions));
+      try {
+        const savedMode = localStorage.getItem('snakes_dual_quiz_mode_v1');
+        if (savedMode === 'cell' || savedMode === 'random') quizAssignMode = savedMode;
+        const saved = localStorage.getItem(cfg.storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) questionBank = parsed;
+        }
+      } catch (e) {}
+      rebuildRandomDeck();
+      updateHeaderImgBadge();
+    }
+
+    function saveQuestionsToStorage() {
+      const cfg = BOOK_CATALOG[currentBookId];
+      try {
+        localStorage.setItem(cfg.storageKey, JSON.stringify(questionBank));
+        localStorage.setItem('snakes_dual_quiz_mode_v1', quizAssignMode);
+      } catch (e) {}
+      updateHeaderImgBadge();
+    }
+
+    function updateHeaderImgBadge() {
+      const badge = document.getElementById('headerImgBadge');
+      if (badge) badge.textContent = `${questionBank.length}題`;
+    }
+
+    function rebuildRandomDeck() {
+      randomDeck = questionBank.map((_, i) => i);
+      for (let i = randomDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [randomDeck[i], randomDeck[j]] = [randomDeck[j], randomDeck[i]];
+      }
+    }
+
+    function drawQuestionForCell(cellNum) {
+      if (questionBank.length === 0) {
+        return { q: "Please read the number aloud!", a: `Number ${cellNum}`, tts: "", img: "", badge: "預設題" };
+      }
+      if (quizAssignMode === 'cell') {
+        const bound = questionBank.find(item => Number(item.cell) === Number(cellNum));
+        if (bound) return { ...bound, badge: `📌 第 ${cellNum} 格挑戰題` };
+      }
+      if (randomDeck.length === 0) rebuildRandomDeck();
+      const nextIdx = randomDeck.pop();
+      const item = questionBank[nextIdx] || questionBank[0];
+      return { ...item, badge: `🎲 隨機題庫（剩餘 ${randomDeck.length} 題）` };
+    }
+
+    function toggleQuizMode() {
+      quizModeEnabled = !quizModeEnabled;
+      const btn = document.getElementById('quizToggleBtn');
+      const txt = document.getElementById('quizModeText');
+      if (quizModeEnabled) {
+        btn.className = 'px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold flex items-center gap-1 transition shadow';
+        txt.textContent = '題庫：開啟';
+      } else {
+        btn.className = 'px-2.5 py-1 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-xs font-bold flex items-center gap-1 transition';
+        txt.textContent = '題庫：關閉';
+      }
+    }
+
+    function parseQuestionAndChoices(rawQ, rawAns) {
+      const choiceRegex = /\(([A-D])\)\s*([^\(\)]+?)(?=\s*\([A-D]\)|$)/g;
+      const choices = [];
+      let match;
+      while ((match = choiceRegex.exec(rawQ)) !== null) {
+        choices.push({ letter: match[1].toUpperCase(), text: match[2].trim() });
+      }
+      let stemText = rawQ;
+      if (choices.length >= 2) {
+        const firstChoiceIdx = rawQ.search(/\([A-D]\)/);
+        if (firstChoiceIdx > 0) stemText = rawQ.slice(0, firstChoiceIdx).trim();
+      }
+      let correctLetter = null;
+      const ansMatch = String(rawAns || '').match(/\(([A-D])\)/i);
+      if (ansMatch) {
+        correctLetter = ansMatch[1].toUpperCase();
+      } else if (choices.length >= 2) {
+        const cleanAns = String(rawAns || '').toLowerCase();
+        const found = choices.find(c => cleanAns.includes(c.text.toLowerCase()));
+        if (found) correctLetter = found.letter;
+      }
+      return { stemText, choices, correctLetter };
+    }
+
+    function askQuizQuestion(title, type, cellNum) {
+      return new Promise(resolve => {
+        pendingQuizCallback = resolve;
+        const item = drawQuestionForCell(cellNum);
+        currentActiveQuizItem = item;
+
+        const { stemText, choices, correctLetter } = parseQuestionAndChoices(item.q, item.a);
+        const isListeningItem = /🎧|Listen/i.test(item.q);
+
+        document.getElementById('quizTitle').textContent = title;
+        document.getElementById('quizQuestionText').textContent = stemText;
+        document.getElementById('quizAnswerText').textContent = item.a || '（開放式作答）';
+        document.getElementById('quizProgressBadge').textContent = item.badge || '課堂挑戰';
+        document.getElementById('quizAnswerBox').classList.add('hidden');
+        document.getElementById('revealAnsBtn').classList.remove('hidden');
+        document.getElementById('choiceFeedbackBanner').classList.add('hidden');
+
+        const scriptReveal = document.getElementById('quizAudioScriptReveal');
+        if (item.tts && item.tts.trim() && isListeningItem) {
+          scriptReveal.textContent = `🎧 聽力原文 (Audio Script)："${item.tts}"`;
+          scriptReveal.classList.remove('hidden');
+        } else {
+          scriptReveal.classList.add('hidden');
+        }
+
+        const listenBanner = document.getElementById('listeningPromptBanner');
+        const normalTts = document.getElementById('normalTtsControls');
+        if (isListeningItem) {
+          listenBanner.classList.remove('hidden');
+          normalTts.classList.add('hidden');
+        } else {
+          listenBanner.classList.add('hidden');
+          normalTts.classList.remove('hidden');
+        }
+
+        const imgWrapper = document.getElementById('quizImageWrapper');
+        const imgEl = document.getElementById('quizImageEl');
+        if (item.img && item.img.trim().length > 0) {
+          imgEl.src = item.img.trim();
+          imgWrapper.classList.remove('hidden');
+          imgWrapper.classList.add('flex');
+        } else {
+          imgEl.src = '';
+          imgWrapper.classList.add('hidden');
+          imgWrapper.classList.remove('flex');
+        }
+
+        const choicesBox = document.getElementById('quizChoicesContainer');
+        const manualBtns = document.getElementById('manualJudgeBtns');
+        if (choices.length >= 2 && correctLetter) {
+          choicesBox.innerHTML = choices.map(c => `
+            <button onclick="handleChoiceClick('${c.letter}', '${correctLetter}', this)"
+              class="choice-opt-btn w-full py-3 px-4 rounded-2xl bg-indigo-800 hover:bg-indigo-700 border-2 border-indigo-400/60 text-left font-black text-base text-white shadow-md transition flex items-center justify-between group">
+              <span><span class="inline-block w-7 h-7 rounded-lg bg-amber-400 text-slate-950 text-center leading-7 mr-2.5 font-black">(${c.letter})</span> ${c.text}</span>
+              <span class="text-xs text-indigo-300 group-hover:text-white">點擊選擇 ➔</span>
+            </button>
+          `).join('');
+          choicesBox.classList.remove('hidden');
+          choicesBox.classList.add('grid');
+          manualBtns.classList.add('hidden');
+        } else {
+          choicesBox.innerHTML = '';
+          choicesBox.classList.add('hidden');
+          choicesBox.classList.remove('grid');
+          manualBtns.classList.remove('hidden');
+        }
+
+        const badge = document.getElementById('quizBadge');
+        if (type === 'ladder') {
+          badge.textContent = '🪜 梯子晉級挑戰 (Ladder Challenge)';
+          badge.className = 'inline-block px-3 py-1 rounded-full bg-sky-400 text-slate-950 font-black text-xs';
+        } else if (type === 'snake') {
+          badge.textContent = '🐍 蛇頭聽力救援 (Snake Rescue)';
+          badge.className = 'inline-block px-3 py-1 rounded-full bg-rose-500 text-white font-black text-xs';
+        } else {
+          badge.textContent = isListeningItem ? '🎧 英語聽力挑戰 (Listen & Choose)' : '🎓 英語課堂挑戰';
+          badge.className = 'inline-block px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs';
+        }
+
+        const modal = document.getElementById('quizChallengeModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        if (isListeningItem) {
+          setTimeout(() => speakCurrentQuestionEnglishOnly(), 250);
+        }
+      });
+    }
+
+    function handleChoiceClick(selectedLetter, correctLetter, clickedBtn) {
+      const allBtns = document.querySelectorAll('.choice-opt-btn');
+      allBtns.forEach(b => b.disabled = true);
+      const isCorrect = (selectedLetter === correctLetter);
+      const feedback = document.getElementById('choiceFeedbackBanner');
+      feedback.classList.remove('hidden');
+
+      if (isCorrect) {
+        clickedBtn.className = 'choice-opt-btn w-full py-3 px-4 rounded-2xl bg-emerald-600 border-2 border-lime-300 text-left font-black text-base text-white shadow-lg flex items-center justify-between';
+        feedback.className = 'w-full py-2 px-3 rounded-xl font-black text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-400/50';
+        feedback.textContent = '🎉 Bingo! 答對了！準備自動過關...';
+        playSound('ladder');
+        revealQuizAnswer();
+        setTimeout(() => resolveQuiz(true), 1250);
+      } else {
+        clickedBtn.className = 'choice-opt-btn w-full py-3 px-4 rounded-2xl bg-rose-700 border-2 border-rose-300 text-left font-black text-base text-white shadow-lg flex items-center justify-between';
+        feedback.className = 'w-full py-2 px-3 rounded-xl font-black text-sm bg-rose-500/20 text-rose-300 border border-rose-400/50';
+        feedback.textContent = `😅 哎呀選錯了！正確答案是 (${correctLetter})！`;
+        playSound('snake');
+        revealQuizAnswer();
+        setTimeout(() => resolveQuiz(false), 1850);
+      }
+    }
+
+    function openImageLightbox() {
+      const src = document.getElementById('quizImageEl').src;
+      if (!src) return;
+      document.getElementById('lightboxImgEl').src = src;
+      const modal = document.getElementById('imageLightboxModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeImageLightbox() {
+      const modal = document.getElementById('imageLightboxModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function extractCleanEnglishForTTS(rawText) {
+      if (!rawText) return '';
+      return rawText
+        .replace(/【.*?】/g, ' ')
+        .replace(/\[.*?\]/g, ' ')
+        .replace(/（.*?）/g, ' ')
+        .replace(/\([^)]*[\u4e00-\u9fa5]+[^)]*\)/g, ' ')
+        .replace(/[\u4e00-\u9fa5]+/g, ' ')
+        .replace(/🔊|🎧|👀|🗣️|🕺|🔢|📖|🪜|🐍|🏆|🎉|🎃|______/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || rawText;
+    }
+
+    function speakCurrentQuestionEnglishOnly() {
+      if (!currentActiveQuizItem) return;
+      const targetScript = (currentActiveQuizItem.tts && currentActiveQuizItem.tts.trim())
+        ? currentActiveQuizItem.tts.trim()
+        : extractCleanEnglishForTTS(currentActiveQuizItem.q);
+      speakEnglishText(targetScript);
+    }
+
+    function speakCurrentAnswer() {
+      if (!currentActiveQuizItem) return;
+      const engAns = extractCleanEnglishForTTS(currentActiveQuizItem.a);
+      speakEnglishText(engAns);
+    }
+
+    function revealQuizAnswer() {
+      document.getElementById('quizAnswerBox').classList.remove('hidden');
+      document.getElementById('revealAnsBtn').classList.add('hidden');
+    }
+
+    function resolveQuiz(passed) {
+      if (currentAudioObj) { currentAudioObj.pause(); currentAudioObj = null; }
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      const modal = document.getElementById('quizChallengeModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      if (pendingQuizCallback) {
+        const cb = pendingQuizCallback;
+        pendingQuizCallback = null;
+        cb(passed);
+      }
+    }
+
+    function formatQuestionsToText(list) {
+      return list.map(item => {
+        const parts = [
+          item.cell ? item.cell : '',
+          item.q || '',
+          item.a || '',
+          item.tts || '',
+          item.img || ''
+        ];
+        while (parts.length > 2 && !parts[parts.length - 1]) parts.pop();
+        return parts.join(' | ');
+      }).join('\n');
+    }
+
+    function parseQuestionsFromText(rawText) {
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const result = [];
+      lines.forEach(line => {
+        const parts = line.split('|').map(s => s.trim());
+        const isFirstNum = /^\d+$/.test(parts[0]);
+        if (isFirstNum) {
+          const cellNum = parseInt(parts[0], 10);
+          result.push({
+            cell: (cellNum >= 1 && cellNum <= 50) ? cellNum : null,
+            q: parts[1] || '請回答問題',
+            a: parts[2] || '完成指定任務即可過關！',
+            tts: parts[3] || '',
+            img: parts[4] || ''
+          });
+        } else {
+          result.push({
+            cell: null,
+            q: parts[0] || '請回答問題',
+            a: parts[1] || '完成指定任務即可過關！',
+            tts: parts[2] || '',
+            img: parts[3] || ''
+          });
+        }
+      });
+      return result;
+    }
+
+    function updateEditorStatsUI() {
+      const total = questionBank.length;
+      const listenCount = questionBank.filter(x => x.tts && x.tts.trim().length > 0).length;
+      const imgCount = questionBank.filter(x => x.img && x.img.trim().length > 0).length;
+      document.getElementById('editorStatsBadge').textContent = `共 ${total} 題（含音稿 ${listenCount} 題 • 含圖卡 ${imgCount} 題）`;
+    }
+
+    function switchEditorTab(tab) {
+      activeEditorTab = tab;
+      const vBtn = document.getElementById('tabBtn_visual');
+      const tBtn = document.getElementById('tabBtn_text');
+      const vBox = document.getElementById('visualEditorContainer');
+      const tBox = document.getElementById('textEditorContainer');
+
+      if (tab === 'visual') {
+        vBtn.className = 'px-3 py-1 rounded-lg font-black bg-purple-600 text-white shadow transition flex items-center gap-1';
+        tBtn.className = 'px-3 py-1 rounded-lg font-black text-slate-400 hover:text-white transition flex items-center gap-1';
+        vBox.classList.remove('hidden');
+        tBox.classList.add('hidden');
+        tBox.classList.remove('flex');
+        renderVisualEditorRows();
+      } else {
+        tBtn.className = 'px-3 py-1 rounded-lg font-black bg-purple-600 text-white shadow transition flex items-center gap-1';
+        vBtn.className = 'px-3 py-1 rounded-lg font-black text-slate-400 hover:text-white transition flex items-center gap-1';
+        tBox.classList.remove('hidden');
+        tBox.classList.add('flex');
+        vBox.classList.add('hidden');
+        document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+      }
+      updateEditorStatsUI();
+    }
+
+    function handleRawTextareaInput() {
+      const raw = document.getElementById('quizTextarea').value;
+      questionBank = parseQuestionsFromText(raw);
+      updateEditorStatsUI();
+    }
+
+    function renderVisualEditorRows() {
+      const container = document.getElementById('visualEditorContainer');
+      if (questionBank.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs">目前題庫是空的！請點擊下方「🔄 恢復本冊預設 50 題」按鈕。</div>`;
+        return;
+      }
+      container.innerHTML = questionBank.map((item, idx) => {
+        const hasImg = item.img && item.img.trim().length > 0;
+        const cellVal = item.cell ? item.cell : '';
+        let cellTag = '';
+        if (LADDERS[cellVal]) cellTag = `<span class="text-[10px] text-sky-400 block">🪜梯➔${LADDERS[cellVal]}</span>`;
+        if (SNAKES[cellVal])  cellTag = `<span class="text-[10px] text-rose-400 block">🐍蛇➔${SNAKES[cellVal]}</span>`;
+
+        return `
+          <div class="bg-slate-900/95 border border-slate-800 hover:border-slate-700 rounded-xl p-2.5 flex flex-col md:flex-row items-start md:items-center gap-2 transition">
+            <div class="flex items-center gap-1.5 w-full md:w-24 shrink-0">
+              <span class="text-[11px] font-black text-slate-500 w-6">#${idx + 1}</span>
+              <div class="flex-1">
+                <input type="number" min="1" max="50" placeholder="隨機" value="${cellVal}"
+                  onchange="updateQuestionField(${idx}, 'cell', this.value)"
+                  class="w-full bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1 text-xs text-amber-300 font-black text-center focus:outline-none focus:border-purple-400" />
+                ${cellTag}
+              </div>
+            </div>
+
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 w-full">
+              <input type="text" placeholder="螢幕題幹與 (A)(B) 選項..." value="${escapeHtmlAttr(item.q)}"
+                oninput="updateQuestionField(${idx}, 'q', this.value)"
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-purple-400" />
+              <input type="text" placeholder="參考解答..." value="${escapeHtmlAttr(item.a)}"
+                oninput="updateQuestionField(${idx}, 'a', this.value)"
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-medium focus:outline-none focus:border-purple-400" />
+              <input type="text" placeholder="🔊 隱藏聽力音稿 (選填)..." value="${escapeHtmlAttr(item.tts || '')}"
+                oninput="updateQuestionField(${idx}, 'tts', this.value)"
+                class="w-full bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs text-amber-200 font-medium focus:outline-none focus:border-amber-400" />
+            </div>
+
+            <div class="flex items-center gap-1.5 w-full md:w-auto justify-end shrink-0">
+              ${hasImg ? `
+                <div class="relative group">
+                  <img src="${escapeHtmlAttr(item.img)}" class="w-10 h-10 rounded-lg object-cover border border-pink-400 bg-white p-0.5 cursor-pointer" onclick="previewEditorImage(${idx})" title="點擊預覽大圖" />
+                  <button onclick="removeQuestionImage(${idx})" class="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-black shadow" title="移除圖片">✕</button>
+                </div>
+              ` : `
+                <button onclick="triggerSingleImageUpload(${idx})" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-pink-700 text-slate-200 hover:text-white text-[11px] font-bold border border-slate-700 transition flex items-center gap-1">
+                  🖼️ 選圖
+                </button>
+              `}
+              <button onclick="deleteQuestionRow(${idx})" class="px-2 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-800 text-rose-300 text-[11px] font-bold border border-rose-900/50 transition" title="刪除此題">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtmlAttr(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function updateQuestionField(idx, field, val) {
+      if (!questionBank[idx]) return;
+      if (field === 'cell') {
+        const num = parseInt(val, 10);
+        questionBank[idx].cell = (num >= 1 && num <= 50) ? num : null;
+        renderVisualEditorRows();
+      } else {
+        questionBank[idx][field] = val;
+      }
+      updateEditorStatsUI();
+    }
+
+    function addNewVisualQuestionRow() {
+      questionBank.push({ cell: null, q: "🎧 Listen and choose! (A) word1 (B) word2", a: "(A) word1", tts: "word1", img: "" });
+      if (activeEditorTab === 'visual') {
+        renderVisualEditorRows();
+        const container = document.getElementById('visualEditorContainer');
+        container.scrollTop = container.scrollHeight;
+      } else {
+        document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+      }
+      updateEditorStatsUI();
+    }
+
+    function deleteQuestionRow(idx) {
+      questionBank.splice(idx, 1);
+      renderVisualEditorRows();
+      updateEditorStatsUI();
+    }
+
+    function removeQuestionImage(idx) {
+      if (!questionBank[idx]) return;
+      questionBank[idx].img = '';
+      renderVisualEditorRows();
+      updateEditorStatsUI();
+    }
+
+    function previewEditorImage(idx) {
+      if (!questionBank[idx] || !questionBank[idx].img) return;
+      document.getElementById('lightboxImgEl').src = questionBank[idx].img;
+      document.getElementById('imageLightboxModal').classList.remove('hidden');
+      document.getElementById('imageLightboxModal').classList.add('flex');
+    }
+
+    function compressImageFileToDataUrl(file, maxDim = 520, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            let w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function triggerSingleImageUpload(idx) {
+      targetUploadQuestionIndex = idx;
+      const input = document.getElementById('singleImageInput');
+      input.value = '';
+      input.click();
+    }
+
+    async function handleSingleImageSelected(event) {
+      const file = event.target.files[0];
+      if (!file || targetUploadQuestionIndex === null || !questionBank[targetUploadQuestionIndex]) return;
+      try {
+        const dataUrl = await compressImageFileToDataUrl(file);
+        questionBank[targetUploadQuestionIndex].img = dataUrl;
+        renderVisualEditorRows();
+        updateEditorStatsUI();
+        showEditorToast('✅ 圖片已自動壓縮並綁定至此題！');
+      } catch (e) {}
+    }
+
+    async function handleBatchImagesSelected(event) {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      let matchedCount = 0, createdCount = 0;
+      for (const file of files) {
+        try {
+          const dataUrl = await compressImageFileToDataUrl(file);
+          const baseName = file.name.replace(/\.[^/.]+$/, '').trim();
+          const numMatch = baseName.match(/^(\d{1,2})(?:[_\-\s].*)?$/);
+          if (numMatch) {
+            const cellNum = parseInt(numMatch[1], 10);
+            if (cellNum >= 1 && cellNum <= 50) {
+              const existing = questionBank.find(q => Number(q.cell) === cellNum);
+              if (existing) { existing.img = dataUrl; matchedCount++; continue; }
+            }
+          }
+          const keyword = baseName.toLowerCase();
+          const kwMatch = questionBank.find(q => q.a.toLowerCase().includes(keyword) || q.q.toLowerCase().includes(keyword));
+          if (kwMatch) { kwMatch.img = dataUrl; matchedCount++; }
+          else {
+            questionBank.push({ cell: null, q: "👀 Look at the picture! What is it?", a: baseName, tts: baseName, img: dataUrl });
+            createdCount++;
+          }
+        } catch (err) {}
+      }
+      if (activeEditorTab === 'visual') renderVisualEditorRows();
+      else document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+      updateEditorStatsUI();
+      showEditorToast(`✅ 成功配對 ${matchedCount} 張圖片、新增 ${createdCount} 道看圖題！`);
+      event.target.value = '';
+    }
+
+    function getTeacherNoteLabel(bookId, cellNum) {
+      const n = Number(cellNum);
+      if (!n) return '自訂補充題';
+      if (bookId === 'WW3') {
+        if (n <= 10) return 'WW3: 課堂用語、數字 11-20 與 a/a_e';
+        if (n <= 20) return 'WW3: 天氣問答與 e/e_e';
+        if (n <= 30) return 'WW3: 時間表達、10-50 與 i/i_e';
+        if (n <= 40) return 'WW3: 文具歸屬問答與 o/o_e';
+        return 'WW3: 空間方位 in/on/under、u/u_e 與萬聖節';
+      } else {
+        if (n <= 5) return 'SF5: Phonics ch vs sh';
+        if (n <= 10) return 'SF5: Phonics wh vs ph';
+        if (n <= 14) return 'SF5: Phonics th 無聲/有聲';
+        if (n <= 20) return 'SF5: Phonics c & g 軟硬音';
+        if (n <= 30) return 'SF5: 星期問答與動物園故事';
+        if (n <= 40) return 'SF5: 日常作息與第三人稱單數文法';
+        return 'SF5: 天氣現象、學校科目與農曆新年';
+      }
+    }
+
+    function buildRowsForSheet(list, bookId) {
+      return list.map(item => ({
+        '指定格號(選填1~50)': item.cell ? Number(item.cell) : '',
+        '螢幕題幹與選項(必填-無單元名)': item.q || '',
+        '參考解答(選填)': item.a || '',
+        '隱藏聽力發音稿(選填-不洩題)': item.tts || '',
+        '圖片(網址或自動內嵌碼-無答案)': item.img || '',
+        '教師備課能力指標備註(不顯示於畫面)': getTeacherNoteLabel(bookId, item.cell)
+      }));
+    }
+
+    function exportQuestionsToExcel() {
+      if (activeEditorTab === 'text') {
+        questionBank = parseQuestionsFromText(document.getElementById('quizTextarea').value);
+      }
+      if (questionBank.length === 0) { alert('目前沒有題目可匯出喔！'); return; }
+
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const rows = buildRowsForSheet(questionBank, currentBookId);
+
+      if (typeof XLSX !== 'undefined') {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{ wch: 16 }, { wch: 58 }, { wch: 36 }, { wch: 38 }, { wch: 34 }, { wch: 36 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `${currentBookId}_50題無洩題題庫`);
+        XLSX.writeFile(wb, `${currentBookId}英語蛇梯棋_50題無洩題題庫_${dateStr}.xlsx`);
+        showEditorToast(`✅ 已匯出 ${currentBookId} Excel (.xlsx)！`);
+      }
+    }
+
+    // 一次匯出含有 WW3 與 Super Fun 5 兩個工作表分頁的二合一 Excel 檔
+    function exportBothBooksToExcel() {
+      if (typeof XLSX === 'undefined') {
+        alert('請確認網路連線以載入 Excel 打包模組。');
+        return;
+      }
+      saveQuestionsToStorage();
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+      let sf5Data = JSON.parse(JSON.stringify(QUESTIONS_SF5));
+      let ww3Data = JSON.parse(JSON.stringify(QUESTIONS_WW3));
+      try {
+        const s1 = localStorage.getItem(BOOK_CATALOG.SF5.storageKey);
+        if (s1) sf5Data = JSON.parse(s1);
+        const s2 = localStorage.getItem(BOOK_CATALOG.WW3.storageKey);
+        if (s2) ww3Data = JSON.parse(s2);
+      } catch (e) {}
+
+      const wb = XLSX.utils.book_new();
+      const wsSF5 = XLSX.utils.json_to_sheet(buildRowsForSheet(sf5Data, 'SF5'));
+      const wsWW3 = XLSX.utils.json_to_sheet(buildRowsForSheet(ww3Data, 'WW3'));
+      const cols = [{ wch: 16 }, { wch: 58 }, { wch: 36 }, { wch: 38 }, { wch: 34 }, { wch: 36 }];
+      wsSF5['!cols'] = cols;
+      wsWW3['!cols'] = cols;
+
+      XLSX.utils.book_append_sheet(wb, wsSF5, '五年級_SuperFun5_50題');
+      XLSX.utils.book_append_sheet(wb, wsWW3, '四年級_WonderWorld3_50題');
+      XLSX.writeFile(wb, `英語蛇梯棋_WW3與SuperFun5雙教材題庫_${dateStr}.xlsx`);
+      showEditorToast('✅ 已匯出 WW3 + Super Fun 5 雙分頁 Excel (.xlsx)！');
+    }
+
+    function handleImportExcelFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'txt') {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const imported = parseQuestionsFromText(e.target.result || '');
+          applyImportedQuestions(imported, file.name);
+        };
+        reader.readAsText(file, 'UTF-8');
+        event.target.value = '';
+        return;
+      }
+      if (typeof XLSX !== 'undefined') {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            const imported = [];
+            rows.forEach((row, rIdx) => {
+              if (!Array.isArray(row) || row.length === 0) return;
+              const c0 = String(row[0] ?? '').trim();
+              const c1 = String(row[1] ?? '').trim();
+              const c2 = String(row[2] ?? '').trim();
+              const c3 = String(row[3] ?? '').trim();
+              const c4 = String(row[4] ?? '').trim();
+              if (!c0 && !c1 && !c2) return;
+              if (rIdx === 0 && (/格號|題幹|題目|question|cell/i.test(c0) || /題幹|題目|question/i.test(c1))) return;
+              const isC3Image = c3.startsWith('data:image') || /^https?:\/\//i.test(c3);
+              if (/^\d+$/.test(c0)) {
+                const num = parseInt(c0, 10);
+                imported.push({ cell: (num >= 1 && num <= 50) ? num : null, q: c1 || '請回答問題', a: c2 || '過關！', tts: isC3Image ? '' : c3, img: isC3Image ? c3 : c4 });
+              } else if (c0 === '' && c1 !== '') {
+                imported.push({ cell: null, q: c1, a: c2 || '過關！', tts: isC3Image ? '' : c3, img: isC3Image ? c3 : c4 });
+              } else {
+                imported.push({ cell: null, q: c0, a: c1 || '過關！', tts: '', img: c2 || '' });
+              }
+            });
+            applyImportedQuestions(imported, file.name);
+          } catch (err) { alert('Excel 解析失敗。'); }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+      event.target.value = '';
+    }
+
+    function applyImportedQuestions(imported, fileName) {
+      if (!imported || imported.length === 0) return;
+      questionBank = imported;
+      const hasCell = imported.some(x => x.cell !== null);
+      if (hasCell) setQuizAssignMode('cell');
+      if (activeEditorTab === 'visual') renderVisualEditorRows();
+      else document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+      updateEditorStatsUI();
+      showEditorToast(`✅ 已從「${fileName}」匯入 ${imported.length} 題！`);
+    }
+
+    function setQuizAssignMode(mode) {
+      quizAssignMode = mode;
+      const btnRandom = document.getElementById('modeBtn_random');
+      const btnCell   = document.getElementById('modeBtn_cell');
+      if (mode === 'random') {
+        btnRandom.className = 'px-2.5 py-1.5 rounded-xl text-xs font-black bg-purple-600 text-white shadow transition';
+        btnCell.className   = 'px-2.5 py-1.5 rounded-xl text-xs font-black bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+      } else {
+        btnCell.className   = 'px-2.5 py-1.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 shadow transition';
+        btnRandom.className = 'px-2.5 py-1.5 rounded-xl text-xs font-black bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+      }
+      updateEditorStatsUI();
+      renderCellBoundIndicators();
+    }
+
+    function openQuizEditor() {
+      document.getElementById('editorBookSelector').value = currentBookId;
+      setQuizAssignMode(quizAssignMode);
+      switchEditorTab(activeEditorTab);
+      document.getElementById('quizEditorModal').classList.remove('hidden');
+      document.getElementById('quizEditorModal').classList.add('flex');
+    }
+
+    function closeQuizEditor() {
+      document.getElementById('quizEditorModal').classList.add('hidden');
+      document.getElementById('quizEditorModal').classList.remove('flex');
+    }
+
+    function clearAllQuestions() {
+      if (!confirm('確定要清空本冊目前編輯器中的所有題目嗎？')) return;
+      questionBank = [];
+      if (activeEditorTab === 'visual') renderVisualEditorRows();
+      else document.getElementById('quizTextarea').value = '';
+      updateEditorStatsUI();
+    }
+
+    function showEditorToast(msg) {
+      const toast = document.getElementById('copyToast');
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3200);
+    }
+
+    function saveCustomQuestions() {
+      if (activeEditorTab === 'text') {
+        questionBank = parseQuestionsFromText(document.getElementById('quizTextarea').value);
+      }
+      questionBank = questionBank.filter(item => item.q && item.q.trim().length > 0);
+      saveQuestionsToStorage();
+      rebuildRandomDeck();
+      renderCellBoundIndicators();
+      if (!quizModeEnabled) toggleQuizMode();
+      closeQuizEditor();
+    }
+
+    function resetDefaultQuestions() {
+      const cfg = BOOK_CATALOG[currentBookId];
+      questionBank = JSON.parse(JSON.stringify(cfg.defaultQuestions));
+      setQuizAssignMode('cell');
+      if (activeEditorTab === 'visual') renderVisualEditorRows();
+      else document.getElementById('quizTextarea').value = formatQuestionsToText(questionBank);
+      saveQuestionsToStorage();
+      rebuildRandomDeck();
+      renderCellBoundIndicators();
+      updateEditorStatsUI();
+      showEditorToast(`✅ 已恢復「${cfg.title}」預設 50 題無洩題專業題庫！`);
+    }
+
+    // =========================================================================
+    // 7. 印出實體桌遊工作坊 (支援 A4 / B4 / A3 尺寸與 300 DPI PNG 輸出)
+    // =========================================================================
+    function openPrintStudio() {
+      selectPaperSize(currentPaperSize);
+      document.getElementById('printStudioModal').classList.remove('hidden');
+      document.getElementById('printStudioModal').classList.add('flex');
+    }
+
+    function closePrintStudio() {
+      document.getElementById('printStudioModal').classList.add('hidden');
+      document.getElementById('printStudioModal').classList.remove('flex');
+    }
+
+    function selectPaperSize(sizeKey) {
+      currentPaperSize = sizeKey;
+      ['A4', 'B4', 'A3'].forEach(k => {
+        const btn = document.getElementById(`sizeBtn_${k}`);
+        if (k === sizeKey) {
+          btn.className = 'p-3 rounded-2xl border-2 border-amber-400 bg-emerald-800/90 text-left transition flex flex-col justify-between shadow-lg scale-[1.02]';
+        } else {
+          btn.className = 'p-3 rounded-2xl border-2 border-emerald-800 bg-emerald-950/70 hover:bg-emerald-900/60 text-left transition flex flex-col justify-between opacity-80';
+        }
+      });
+      document.getElementById('printBtnSizeLabel').textContent = sizeKey;
+      document.getElementById('pngBtnSizeLabel').textContent = sizeKey;
+    }
+
+    function injectDynamicPageSizeStyle(sizeKey, withMargin) {
+      let styleEl = document.getElementById('dynamicPrintPageStyle');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'dynamicPrintPageStyle';
+        document.head.appendChild(styleEl);
+      }
+      const spec = PAPER_SPECS[sizeKey];
+      styleEl.innerHTML = `@media print { @page { size: ${spec.mmW}mm ${spec.mmH}mm; margin: ${withMargin ? '5mm' : '0mm'}; } }`;
+    }
+
+    function triggerDirectPrint() {
+      const hidePawns = document.getElementById('hidePawnsOnExport').checked;
+      const keepMargin = document.getElementById('keepSafeMargin').checked;
+      const pawnsLayer = document.getElementById('pawnsLayer');
+      injectDynamicPageSizeStyle(currentPaperSize, keepMargin);
+      if (hidePawns) pawnsLayer.style.display = 'none';
+      closePrintStudio();
+      setTimeout(() => { window.print(); pawnsLayer.style.display = ''; }, 180);
+    }
+
+    function serializeCleanSvg(hidePawns) {
+      const svgEl = document.getElementById('snakesBoardSvg');
+      const clone = svgEl.cloneNode(true);
+      if (hidePawns) {
+        const pawns = clone.querySelector('#pawnsLayer');
+        if (pawns) pawns.innerHTML = '';
+      }
+      const styleTag = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      styleTag.textContent = `.board-number { font-family: 'Fredoka', 'Arial Black', sans-serif; font-weight: 800; fill: #ffeb3b; stroke: #152218; stroke-width: 5px; paint-order: stroke fill; stroke-linejoin: round; stroke-linecap: round; font-size: 27px; text-anchor: middle; dominant-baseline: central; }`;
+      clone.insertBefore(styleTag, clone.firstChild);
+      return new XMLSerializer().serializeToString(clone);
+    }
+
+    function downloadVectorSVG() {
+      const hidePawns = document.getElementById('hidePawnsOnExport').checked;
+      const svgData = serializeCleanSvg(hidePawns);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `snakes_and_ladders_${currentPaperSize}.svg`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportHighResPNG() {
+      const spec = PAPER_SPECS[currentPaperSize];
+      const hidePawns = document.getElementById('hidePawnsOnExport').checked;
+      const keepMargin = document.getElementById('keepSafeMargin').checked;
+      const btn = document.getElementById('exportPngBtn');
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = `⏳ 正在渲染 ${spec.name} (300 DPI)...`;
+      btn.disabled = true;
+
+      const svgData = serializeCleanSvg(hidePawns);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('exportCanvas');
+        canvas.width = spec.pxW; canvas.height = spec.pxH;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const padPx = keepMargin ? Math.round(spec.pxW * 0.016) : 0;
+        ctx.drawImage(img, padPx, padPx, canvas.width - padPx * 2, canvas.height - padPx * 2);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          const pngUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = pngUrl; a.download = `英語蛇梯棋桌遊_${spec.name}_300DPI_${spec.pxW}x${spec.pxH}.png`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(pngUrl);
+          btn.innerHTML = oldHtml; btn.disabled = false;
+        }, 'image/png');
+      };
+      img.src = url;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        const savedBook = localStorage.getItem('snakes_dual_active_book');
+        if (savedBook && BOOK_CATALOG[savedBook]) {
+          currentBookId = savedBook;
+          document.getElementById('bookSelector').value = savedBook;
+        }
+      } catch (e) {}
+      loadSavedQuestionsForCurrentBook();
+      updateSidebarBookInfo();
+      loadVoiceSettings();
+      initSpeechVoices();
+      renderEntireBoard();
+      setPlayerCount(2);
+    });
+  </script>
+</body>
+</html>
